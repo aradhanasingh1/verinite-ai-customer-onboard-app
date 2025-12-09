@@ -1,0 +1,30 @@
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://backend:5000
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ../address-verification-agent
+      dockerfile: backend/.dockerfile
+    env_file:
+      - ../address-verification-agent/.env
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=development
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    volumes:
+      - ../address-verification-agent/backend:/app/backend
+    working_dir: /app/backend

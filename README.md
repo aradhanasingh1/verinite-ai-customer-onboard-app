@@ -1,36 +1,141 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Verinite AI Customer Onboarding Application
+
+A modern customer onboarding application built with Next.js, TypeScript, and Docker. This application integrates with an address verification service to validate customer addresses during the onboarding process.
+
+## Features
+
+- Multi-step customer onboarding form
+- Address verification integration
+- Responsive design with Tailwind CSS
+- Docker containerization
+- TypeScript for type safety
+
+## Prerequisites
+
+- Docker and Docker Compose
+- Node.js 20.x or later
+- npm or yarn
 
 ## Getting Started
 
-First, run the development server:
+### Development
+
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
+3. Start the development server:
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+### Docker Setup
+
+This project includes Docker configuration for both development and production environments.
+
+#### Development with Docker
+
+1. Build and start the development containers:
+   ```bash
+   docker-compose up --build
+   ```
+2. The application will be available at [http://localhost:3000](http://localhost:3000)
+3. The backend API will be available at [http://localhost:5000](http://localhost:5000)
+
+#### Production Build
+
+To build and run the production containers:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+docker-compose -f docker-compose.prod.yml up --build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment Variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Create a `.env` file in the root directory with the following variables:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```env
+NEXT_PUBLIC_API_URL=http://localhost:5000
+# Add other environment variables as needed
+```
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+```
+verinite-ai-customer-onboard-app/
+├── app/                    # Next.js app directory
+│   ├── page.tsx            # Main page component
+│   └── ...
+├── src/
+│   └── components/         # Reusable components
+│       └── Form/           # Multi-step form components
+├── public/                 # Static files
+├── .dockerignore
+├── .env.example           # Example environment variables
+├── docker-compose.yml     # Development docker-compose
+├── docker-compose.prod.yml # Production docker-compose
+├── Dockerfile             # Development Dockerfile
+├── Dockerfile.prod        # Production Dockerfile
+└── package.json
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Available Scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm start` - Start production server
+- `npm run lint` - Run ESLint
+- `npm test` - Run tests
 
-## Deploy on Vercel
+## Docker Commands
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Build and start all services:
+  ```bash
+  docker-compose up --build
+  ```
+- Stop all services:
+  ```bash
+  docker-compose down
+  ```
+- View logs:
+  ```bash
+  docker-compose logs -f
+  ```
+- Run a command in a specific service:
+  ```bash
+  docker-compose exec web npm run lint
+  ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Troubleshooting
+
+- If you encounter port conflicts, check and stop any processes using ports 3000 (frontend) or 5000 (backend).
+- Ensure all environment variables are properly set in your `.env` file.
+- If Docker build fails, try cleaning up Docker resources:
+  ```bash
+  docker system prune -a
+  docker volume prune
+  ```
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Docker Documentation](https://docs.docker.com/)
+- [TypeScript Documentation](https://www.typescriptlang.org/docs/)

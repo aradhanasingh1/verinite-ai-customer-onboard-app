@@ -1,3 +1,5 @@
+import { Dispatch, SetStateAction } from "react";
+
 export interface FormData {
   fullName: string;
   email: string;
@@ -18,7 +20,9 @@ export interface FormData {
 }
 
 export interface FormStepProps {
-  formData: FormData;
+ formData: FormData;
   handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
-  errors?: Record<string, string>;
+  errors: Record<string, string>;
+  setFormData: Dispatch<SetStateAction<FormData>>;
+
 }

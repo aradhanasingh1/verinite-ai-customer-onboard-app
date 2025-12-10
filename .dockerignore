@@ -1,0 +1,11 @@
+# .dockerignore
+node_modules
+.next
+.git
+.env.local
+.env.development
+.env.production
+.env.test
+.vercel
+.turbo
+.cache

@@ -3,13 +3,17 @@ import PersonalInfoStep from './PersonalInfoStep';
 import AddressInfoStep from './AddressInfoStep';
 import AdditionalInfoStep from './AdditionalInfoStep';
 import SuccessStep from './SuccessStep';
-import { FormData } from './types';
+import { verifyAddress } from '../../utils/api';
+import { FormData, VerifiedAddress } from './types';
+
 
 const MultiStepForm: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [verifiedAddress, setVerifiedAddress] = useState<VerifiedAddress | null>(null);
+
   
   const [formData, setFormData] = useState<FormData>({
     fullName: '',
@@ -31,38 +35,38 @@ const MultiStepForm: React.FC = () => {
   });
 
   const validateStep = (step: number) => {
-    const newErrors: Record<string, string> = {};
-    
-    if (step === 1) {
-      if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
-      if (!formData.email.trim()) {
-        newErrors.email = 'Email is required';
-      } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-        newErrors.email = 'Email is invalid';
-      }
-      if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
-      if (!formData.dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
+  const newErrors: Record<string, string> = {};
+  
+  if (step === 1) {
+    if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Email is invalid';
     }
-    
-    if (step === 2) {
-      if (!formData.address.trim()) newErrors.address = 'Address is required';
-      if (!formData.city.trim()) newErrors.city = 'City is required';
-      if (!formData.state.trim()) newErrors.state = 'State/Province is required';
-      if (!formData.zipCode.trim()) newErrors.zipCode = 'ZIP/Postal code is required';
-      if (!formData.country) newErrors.country = 'Country is required';
-    }
-    
-    if (step === 3) {
-      if (!formData.idNumber.trim()) newErrors.idNumber = 'ID number is required';
-      if (!formData.occupation.trim()) newErrors.occupation = 'Occupation is required';
-      if (!formData.annualIncome) newErrors.annualIncome = 'Annual income is required';
-      if (!formData.sourceOfFunds.trim()) newErrors.sourceOfFunds = 'Source of funds is required';
-      if (!formData.termsAccepted) newErrors.termsAccepted = 'You must accept the terms';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
+    if (!formData.dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
+  }
+  
+  if (step === 2) {
+    if (!formData.address.trim()) newErrors.address = 'Address is required';
+    if (!formData.city.trim()) newErrors.city = 'City is required';
+    if (!formData.state.trim()) newErrors.state = 'State/Province is required';
+    if (!formData.zipCode.trim()) newErrors.zipCode = 'ZIP/Postal code is required';
+    if (!formData.country) newErrors.country = 'Country is required';
+  }
+  
+  if (step === 3) {
+    if (!formData.idNumber.trim()) newErrors.idNumber = 'ID number is required';
+    if (!formData.occupation.trim()) newErrors.occupation = 'Occupation is required';
+    if (!formData.annualIncome) newErrors.annualIncome = 'Annual income is required';
+    if (!formData.sourceOfFunds.trim()) newErrors.sourceOfFunds = 'Source of funds is required';
+    if (!formData.termsAccepted) newErrors.termsAccepted = 'You must accept the terms';
+  }
+  
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
@@ -74,9 +78,69 @@ const MultiStepForm: React.FC = () => {
     }));
   };
 
-  const nextStep = () => {
-    if (validateStep(currentStep)) {
-      setCurrentStep(prev => Math.min(prev + 1, 3));
+  const nextStep = async () => {
+    if (currentStep === 2) {
+      // Clear previous errors
+      setErrors({});
+      
+      // Basic validation
+      const newErrors: Record<string, string> = {};
+      if (!formData.address.trim()) newErrors.address = 'Address is required';
+      if (!formData.city.trim()) newErrors.city = 'City is required';
+      if (!formData.state.trim()) newErrors.state = 'State/Province is required';
+      if (!formData.zipCode.trim()) newErrors.zipCode = 'ZIP/Postal code is required';
+      if (!formData.country) newErrors.country = 'Country is required';
+      
+      if (Object.keys(newErrors).length > 0) {
+        setErrors(newErrors);
+        return;
+      }
+
+      try {
+        setIsSubmitting(true);
+        const fullAddress = `${formData.address}, ${formData.city}, ${formData.state} ${formData.zipCode}, ${formData.country}`.trim();
+        const result = await verifyAddress(fullAddress);
+        
+        if (result.success && result.data.is_valid) {
+          // Store the verified address
+          const verifiedAddress = {
+            original: fullAddress,
+            verified: result.data.verified_address || fullAddress,
+            isVerified: true,
+            verifiedAt: new Date()
+          };
+          setVerifiedAddress(verifiedAddress);
+          
+          // Update the form with the verified address
+          setFormData(prev => ({
+            ...prev,
+            address: verifiedAddress.verified
+          }));
+          
+          // Proceed to next step
+          setCurrentStep(3);
+        } else {
+          setErrors(prev => ({
+            ...prev,
+            addressVerification: result.data?.suggested_corrections?.[0] || 'Address verification failed'
+          }));
+        }
+      } catch (error) {
+        setErrors(prev => ({
+          ...prev,
+          addressVerification: 'Error verifying address. Please try again.'
+        }));
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else if (currentStep === 3) {
+      // On the last step, trigger form submission
+      handleSubmit(new Event('submit') as any);
+    } else {
+      // For other steps, just validate and proceed
+      if (validateStep(currentStep)) {
+        setCurrentStep(prev => prev + 1);
+      }
     }
   };
 
@@ -87,21 +151,31 @@ const MultiStepForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // If not on the last step, just go to next step
     if (currentStep < 3) {
       nextStep();
       return;
     }
 
+    // On the last step, validate and submit
     if (!validateStep(currentStep)) return;
 
     setIsSubmitting(true);
     try {
-      // Here you would typically send the data to your backend
-      console.log('Form submitted:', formData);
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+      const submissionData = {
+        ...formData,
+        verifiedAddress: verifiedAddress || null
+      };
+      
+      console.log('Form submitted:', submissionData);
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // On successful submission
       setIsSuccess(true);
     } catch (error) {
       console.error('Error submitting form:', error);
+      // You might want to show an error message to the user here
     } finally {
       setIsSubmitting(false);
     }
@@ -109,26 +183,27 @@ const MultiStepForm: React.FC = () => {
 
   const resetForm = () => {
     setFormData({
-      fullName: '',
-      email: '',
-      phone: '',
-      address: '',
-      city: '',
-      state: '',
-      zipCode: '',
-      country: '',
-      idType: 'passport',
-      idNumber: '',
-      dateOfBirth: '',
-      occupation: '',
-      annualIncome: '',
-      sourceOfFunds: '',
-      purposeOfAccount: 'personal',
-      termsAccepted: false,
+       fullName: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    country: '',
+    idType: 'passport',
+    idNumber: '',
+    dateOfBirth: '',
+    occupation: '',
+    annualIncome: '',
+    sourceOfFunds: '',
+    purposeOfAccount: 'personal',
+    termsAccepted: false,
     });
-    setCurrentStep(1);
-    setIsSuccess(false);
-    setErrors({});
+  setVerifiedAddress(null);
+  setCurrentStep(1);
+  setIsSuccess(false);
+  setErrors({});
   };
 
   const renderStep = () => {
@@ -143,6 +218,7 @@ const MultiStepForm: React.FC = () => {
             formData={formData} 
             handleChange={handleChange} 
             errors={errors}
+            setFormData={setFormData}  // Add this line
           />
         )}
         
@@ -151,14 +227,17 @@ const MultiStepForm: React.FC = () => {
             formData={formData} 
             handleChange={handleChange} 
             errors={errors}
+            setFormData={setFormData}
+            verifiedAddress={verifiedAddress}
           />
         )}
-        
+
         {currentStep === 3 && (
           <AdditionalInfoStep 
             formData={formData} 
             handleChange={handleChange} 
             errors={errors}
+            setFormData={setFormData}
           />
         )}
 
@@ -174,25 +253,20 @@ const MultiStepForm: React.FC = () => {
             Previous
           </button>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            {isSubmitting ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Processing...
-              </>
-            ) : currentStep === 3 ? (
-              'Submit Application'
-            ) : (
-              'Next'
-            )}
-          </button>
+         
+
+<button
+  type={currentStep === 3 ? "submit" : "button"}
+  onClick={currentStep === 3 ? undefined : nextStep}
+  disabled={isSubmitting}
+  className={`ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${
+    isSubmitting
+      ? 'bg-blue-400 cursor-not-allowed'
+      : 'bg-blue-600 hover:bg-blue-700'
+  } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+>
+  {isSubmitting ? 'Processing...' : currentStep === 3 ? 'Submit Application' : 'Next'}
+</button>
         </div>
       </form>
     );

@@ -19,10 +19,17 @@ export interface FormData {
   termsAccepted: boolean;
 }
 
+export interface VerifiedAddress {
+  original: string;
+  verified: string;
+  isVerified: boolean;
+  verifiedAt?: Date;
+}
+
 export interface FormStepProps {
  formData: FormData;
   handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
   errors: Record<string, string>;
   setFormData: Dispatch<SetStateAction<FormData>>;
-
+  verifiedAddress?: VerifiedAddress | null;
 }

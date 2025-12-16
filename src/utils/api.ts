@@ -1,20 +1,27 @@
-export const verifyAddress = async (address: string) => {
+import axios from 'axios';
+
+export const verifyAddress = async (
+  address: string, 
+  city: string, 
+  state: string, 
+  zipCode: string, 
+  country: string
+) => {
   try {
-    const response = await fetch('http://localhost:5000/verify-address', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ address }),
+    const response = await axios.post('http://localhost:4000/address/verify', {
+      line1: address,  // Changed from 'address' to 'line1'
+      city,
+      state,
+      postalCode: zipCode,  // Changed from 'zipCode' to 'postalCode'
+      country
     });
-
-    if (!response.ok) {
-      throw new Error('Failed to verify address');
+    return response.data;
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.log('Request was aborted');
+      return;
     }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Address verification error:', error);
+    console.error('Error verifying address:', error);
     throw error;
   }
 };

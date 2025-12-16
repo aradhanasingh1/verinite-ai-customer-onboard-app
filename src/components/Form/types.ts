@@ -4,10 +4,10 @@ export interface FormData {
   fullName: string;
   email: string;
   phone: string;
-  address: string;
+  line1: string;
   city: string;
   state: string;
-  zipCode: string;
+  postalCode: string;
   country: string;
   idType: string;
   idNumber: string;
@@ -25,11 +25,41 @@ export interface VerifiedAddress {
   isVerified: boolean;
   verifiedAt?: Date;
 }
+export interface VerificationResult {
+  isValid: boolean;
+  message: string;
+  verifiedAddress?: string;
+}
 
 export interface FormStepProps {
- formData: FormData;
+  formData: FormData;
   handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
   errors: Record<string, string>;
-  setFormData: Dispatch<SetStateAction<FormData>>;
+  setFormData: React.Dispatch<React.SetStateAction<FormData>>;
   verifiedAddress?: VerifiedAddress | null;
+  setErrors?: (errors: Record<string, string>) => void;
+  onNext?: () => void;
+  onPrevious?: () => void;
+}
+
+export type Proposal = 'approve' | 'deny' | 'escalate';
+export interface AgentOutput {
+  proposal: Proposal;
+  confidence: number;
+  reasons: string[];
+  policy_refs: string[];
+  flags: Record<string, any>;
+  metadata?: {
+    agent_name?: string;
+    version?: string;
+    slot?: string;
+    [key: string]: any;
+  };
+}
+
+export interface AgentContext {
+    customerId: string;
+    applicationId: string;
+    slot: string;
+    payload: Record<string, any>;
 }

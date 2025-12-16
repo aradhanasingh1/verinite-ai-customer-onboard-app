@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import PersonalInfoStep from './PersonalInfoStep';
 import AddressInfoStep from './AddressInfoStep';
 import AdditionalInfoStep from './AdditionalInfoStep';
@@ -14,15 +15,15 @@ const MultiStepForm: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [verifiedAddress, setVerifiedAddress] = useState<VerifiedAddress | null>(null);
 
-  
+
   const [formData, setFormData] = useState<FormData>({
     fullName: '',
     email: '',
     phone: '',
-    address: '',
+    line1: '',
     city: '',
     state: '',
-    zipCode: '',
+    postalCode: '',
     country: '',
     idType: 'passport',
     idNumber: '',
@@ -34,34 +35,26 @@ const MultiStepForm: React.FC = () => {
     termsAccepted: false,
   });
 
-  const validateStep = (step: number) => {
+const validateStep = (step: number) => {
   const newErrors: Record<string, string> = {};
   
   if (step === 1) {
-    if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
-    if (!formData.email.trim()) {
+    if (!formData.fullName?.trim()) newErrors.fullName = 'Full name is required';
+    if (!formData.email?.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email is invalid';
     }
-    if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
+    if (!formData.phone?.trim()) newErrors.phone = 'Phone number is required';
     if (!formData.dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
   }
   
   if (step === 2) {
-    if (!formData.address.trim()) newErrors.address = 'Address is required';
-    if (!formData.city.trim()) newErrors.city = 'City is required';
-    if (!formData.state.trim()) newErrors.state = 'State/Province is required';
-    if (!formData.zipCode.trim()) newErrors.zipCode = 'ZIP/Postal code is required';
+    if (!formData.line1?.trim()) newErrors.line1 = 'Address is required';
+    if (!formData.city?.trim()) newErrors.city = 'City is required';
+    if (!formData.state?.trim()) newErrors.state = 'State/Province is required';
+    if (!formData.postalCode?.trim()) newErrors.postalCode = 'ZIP/Postal code is required';
     if (!formData.country) newErrors.country = 'Country is required';
-  }
-  
-  if (step === 3) {
-    if (!formData.idNumber.trim()) newErrors.idNumber = 'ID number is required';
-    if (!formData.occupation.trim()) newErrors.occupation = 'Occupation is required';
-    if (!formData.annualIncome) newErrors.annualIncome = 'Annual income is required';
-    if (!formData.sourceOfFunds.trim()) newErrors.sourceOfFunds = 'Source of funds is required';
-    if (!formData.termsAccepted) newErrors.termsAccepted = 'You must accept the terms';
   }
   
   setErrors(newErrors);
@@ -78,118 +71,111 @@ const MultiStepForm: React.FC = () => {
     }));
   };
 
-  const nextStep = async () => {
-    if (currentStep === 2) {
-      // Clear previous errors
-      setErrors({});
-      
-      // Basic validation
-      const newErrors: Record<string, string> = {};
-      if (!formData.address.trim()) newErrors.address = 'Address is required';
-      if (!formData.city.trim()) newErrors.city = 'City is required';
-      if (!formData.state.trim()) newErrors.state = 'State/Province is required';
-      if (!formData.zipCode.trim()) newErrors.zipCode = 'ZIP/Postal code is required';
-      if (!formData.country) newErrors.country = 'Country is required';
-      
-      if (Object.keys(newErrors).length > 0) {
-        setErrors(newErrors);
-        return;
-      }
-
-      try {
-        setIsSubmitting(true);
-        const fullAddress = `${formData.address}, ${formData.city}, ${formData.state} ${formData.zipCode}, ${formData.country}`.trim();
-        const result = await verifyAddress(fullAddress);
-        
-        if (result.success && result.data.is_valid) {
-          // Store the verified address
-          const verifiedAddress = {
-            original: fullAddress,
-            verified: result.data.verified_address || fullAddress,
-            isVerified: true,
-            verifiedAt: new Date()
-          };
-          setVerifiedAddress(verifiedAddress);
-          
-          // Update the form with the verified address
-          setFormData(prev => ({
-            ...prev,
-            address: verifiedAddress.verified
-          }));
-          
-          // Proceed to next step
-          setCurrentStep(3);
-        } else {
-          setErrors(prev => ({
-            ...prev,
-            addressVerification: result.data?.suggested_corrections?.[0] || 'Address verification failed'
-          }));
-        }
-      } catch (error) {
-        setErrors(prev => ({
-          ...prev,
-          addressVerification: 'Error verifying address. Please try again.'
-        }));
-      } finally {
-        setIsSubmitting(false);
-      }
-    } else if (currentStep === 3) {
-      // On the last step, trigger form submission
-      handleSubmit(new Event('submit') as any);
-    } else {
-      // For other steps, just validate and proceed
-      if (validateStep(currentStep)) {
-        setCurrentStep(prev => prev + 1);
-      }
+ const nextStep = async () => {
+  if (currentStep === 2) {
+    // Clear previous errors
+    setErrors({});
+    
+    // Basic validation
+    const newErrors: Record<string, string> = {};
+    if (!formData.line1?.trim()) newErrors.line1 = 'Address is required';
+    if (!formData.city?.trim()) newErrors.city = 'City is required';
+    if (!formData.state?.trim()) newErrors.state = 'State/Province is required';
+    if (!formData.postalCode?.trim()) newErrors.postalCode = 'ZIP/Postal code is required';
+    if (!formData.country) newErrors.country = 'Country is required';
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
     }
-  };
-
+    
+    // If we get here, validation passed
+    setCurrentStep(prev => prev + 1);
+  } else if (currentStep === 3) {
+    // Handle form submission
+    handleFormSubmit(new Event('submit') as any);
+  } else {
+    // For other steps, just validate and proceed
+    if (validateStep(currentStep)) {
+      setCurrentStep(prev => prev + 1);
+    }
+  }
+};
   const prevStep = () => {
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+ const handleFormSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  // If not on the last step, just go to next step
+  if (currentStep < 3) {
+    nextStep();
+    return;
+  }
+
+  // This is the last step, handle form submission
+  setIsSubmitting(true);
+  
+  try {
+    // Send all form data to the orchestration service
+    const response = await axios.post('http://localhost:4000/onboarding/start', {
+      customerId: 'temp-customer-id',
+      applicationId: `app-${Date.now()}`,
+      payload: formData
+    });
+
+    const traceId = response.data.traceId;
     
-    // If not on the last step, just go to next step
-    if (currentStep < 3) {
-      nextStep();
-      return;
-    }
+    // Poll for results
+    const checkStatus = async () => {
+      try {
+        const statusResponse = await axios.get(`http://localhost:4000/onboarding/trace/${traceId}`);
+        
+        if (statusResponse.data.status === 'completed') {
+          // Handle successful completion
+          setIsSuccess(true);
+          setCurrentStep(4); // Move to success step
+        } else if (statusResponse.data.status === 'failed') {
+          throw new Error(statusResponse.data.error || 'Submission failed');
+        } else {
+          // Still processing, check again after delay
+          setTimeout(checkStatus, 1000);
+        }
+      } catch (error) {
+        console.error('Error checking status:', error);
+        throw error; // Re-throw to be caught by the outer catch
+      }
+    };
 
-    // On the last step, validate and submit
-    if (!validateStep(currentStep)) return;
-
-    setIsSubmitting(true);
-    try {
-      const submissionData = {
-        ...formData,
-        verifiedAddress: verifiedAddress || null
-      };
-      
-      console.log('Form submitted:', submissionData);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // On successful submission
-      setIsSuccess(true);
-    } catch (error) {
-      console.error('Error submitting form:', error);
-      // You might want to show an error message to the user here
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    // Start polling
+    await checkStatus();
+  } catch (error: unknown) {
+  console.error('Error submitting form:', error);
+  const errorMessage = error instanceof Error 
+    ? error.message 
+    : error && typeof error === 'object' && 'message' in error
+      ? String(error.message)
+      : 'Failed to submit form';
+  
+  setErrors(prev => ({
+    ...prev,
+    submission: errorMessage
+  }));
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const resetForm = () => {
     setFormData({
-       fullName: '',
+    fullName: '',
     email: '',
     phone: '',
-    address: '',
+    line1: '',
     city: '',
     state: '',
-    zipCode: '',
+    postalCode: '',
     country: '',
     idType: 'passport',
     idNumber: '',
@@ -212,7 +198,7 @@ const MultiStepForm: React.FC = () => {
     }
 
     return (
-      <form onSubmit={handleSubmit} className="p-6 sm:p-8">
+      <form onSubmit={handleFormSubmit} className="p-6 sm:p-8">
         {currentStep === 1 && (
           <PersonalInfoStep 
             formData={formData} 
@@ -222,15 +208,20 @@ const MultiStepForm: React.FC = () => {
           />
         )}
         
-        {currentStep === 2 && (
-          <AddressInfoStep 
-            formData={formData} 
-            handleChange={handleChange} 
-            errors={errors}
-            setFormData={setFormData}
-            verifiedAddress={verifiedAddress}
-          />
-        )}
+{currentStep === 2 && (
+  <AddressInfoStep 
+    formData={formData}
+    handleChange={handleChange}
+    errors={errors}
+    setFormData={setFormData}
+    onNext={() => {
+      if (validateStep(2)) {
+        setCurrentStep(3);
+      }
+    }}
+    onPrevious={() => setCurrentStep(1)} // Add this line
+  />
+)}
 
         {currentStep === 3 && (
           <AdditionalInfoStep 

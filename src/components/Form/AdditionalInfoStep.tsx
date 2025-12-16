@@ -22,6 +22,7 @@ const AdditionalInfoStep: React.FC<FormStepProps> = ({ formData, handleChange, e
             <option value="passport">Passport</option>
             <option value="drivers-license">Driver's License</option>
             <option value="national-id">National ID</option>
+            <option value="pan">PAN</option>
           </select>
         </div>
 

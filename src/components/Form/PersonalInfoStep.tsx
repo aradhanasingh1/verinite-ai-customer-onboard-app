@@ -20,6 +20,26 @@ const PersonalInfoStep: React.FC<FormStepProps> = ({ formData, handleChange, err
             required
           />
         </div>
+
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Gender *
+            {errors?.gender && <span className="text-red-500 text-xs ml-2">{errors.gender}</span>}
+          </label>
+          <select
+            name="gender"
+            value={formData.gender || ''}
+            onChange={handleChange}
+            className={`w-full px-4 py-2 border ${errors?.gender ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-blue-500 focus:border-blue-500`}
+            required
+          >
+            <option value="">Select Gender</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+            <option value="prefer-not-to-say">Prefer not to say</option>
+          </select>
+        </div>
         
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-700">

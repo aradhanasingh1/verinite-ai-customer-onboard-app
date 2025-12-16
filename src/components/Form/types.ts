@@ -1,8 +1,13 @@
 import { Dispatch, SetStateAction } from "react";
-
+export interface SuccessStepProps {
+  onNewSubmission: () => void;
+  finalDecision?: string | null;
+}
 export interface FormData {
   fullName: string;
   email: string;
+  gender: string;
+  cibilScore: string;
   phone: string;
   line1: string;
   city: string;
@@ -20,10 +25,11 @@ export interface FormData {
 }
 
 export interface VerifiedAddress {
-  original: string;
-  verified: string;
-  isVerified: boolean;
-  verifiedAt?: Date;
+  line1?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
 }
 export interface VerificationResult {
   isValid: boolean;

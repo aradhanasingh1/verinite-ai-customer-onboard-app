@@ -46,7 +46,7 @@ const AddressInfoStep: React.FC<AddressInfoStepProps> = ({
     try {
       setVerificationResult(null);
       
-      const response = await axios.post('http://localhost:4000/address/verify', {
+      const response = await axios.post('http://localhost:4000/onboarding/verify-address', {
         line1,
         city,
         state,

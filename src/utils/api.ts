@@ -11,7 +11,8 @@ export const verifyAddress = async (
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
   try {
-    const response = await axios.post('http://localhost:4000/address/verify', {
+    const response = await axios.post('http://localhost:4000/onboarding/verify-address', {
+    // const response = await axios.post('http://localhost:5000/api/v1/verify', {
       line1: address,
       city,
       state,

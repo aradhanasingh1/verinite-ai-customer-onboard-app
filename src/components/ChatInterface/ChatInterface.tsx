@@ -6,25 +6,32 @@ import { UserDetailsAgent } from '@/agents/userDetails/UserDetailsAgent';
 import { ChatMessage } from '@/types/chat';
 import { formatTime } from '@/utils/dateUtils';
 import { verifyAddress } from '@/services/addressVerificationService';
+import { getAISuggestions } from '@/services/aiSuggestionService';
 
-// Log orchestration events
-const logOrchestration = (event: string, data: any) => {
-  console.log(`[Orchestration] ${event}:`, data);
-  // In a real app, you would send this to your orchestration service
-};
-
-// Client-side only chat component
+interface Address {
+  line1?: string;
+  line2?: string | null;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+}
 function ClientSideChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [currentField, setCurrentField] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [currentField, setCurrentField] = useState<string | null>(null);
 
   // Initialize agent
   const [agent] = useState(() => {
     return new UserDetailsAgent((message) => {
+      // Update current field based on the message field
+      if (message.field) {
+        setCurrentField(message.field);
+      }
+      
       const normalizedMessage = {
         ...message,
         timestamp: message.timestamp instanceof Date 
@@ -32,7 +39,6 @@ function ClientSideChat() {
           : message.timestamp
       };
       setMessages(prev => [...prev, normalizedMessage]);
-      setCurrentField(normalizedMessage.field || null);
     });
   });
 
@@ -41,257 +47,248 @@ function ClientSideChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleDocumentUpload = async (file: File) => {
-    if (!file) return;
+
+const formatAddress = (address: Address | null | undefined): string => {
+  if (!address) return '';
+  const { line1, line2, city, state, postalCode, country } = address;
+  return [line1, line2, city && state && postalCode ? `${city}, ${state} ${postalCode}` : null, country]
+    .filter(Boolean)
+    .join(', ');
+};
+  // Handle address verification
+  const handleAddressVerification = async (address: string) => {
+    setIsVerifying(true);
     
-    setIsUploading(true);
-    logOrchestration('DocumentUploadStarted', { fileName: file.name, type: file.type });
-
     try {
-      const formData = new FormData();
-      formData.append('document', file);
-      
-      // Call KYC service via orchestration
-      logOrchestration('KYCDocumentSubmission', { field: currentField });
-      
-      // In a real app, this would be an API call to your orchestration layer
-      const response = await fetch('/api/kyc/verify', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        logOrchestration('KYCSuccess', { documentType: result.documentType });
-        
-        // Get Groq suggestions for the uploaded document
-        const suggestions = await getGroqSuggestions('document_verification', {
-          documentType: result.documentType,
-          status: 'verified'
-        });
-        
-        // Add suggestions to the chat
-        if (suggestions && suggestions.length > 0) {
-          setMessages(prev => [...prev, {
-            id: `suggestion-${Date.now()}`,
-            content: `Here are some suggestions based on your document:\n${suggestions.join('\n')}`,
-            role: 'assistant',
-            type: 'suggestion',
-            timestamp: new Date()
-          }]);
-        }
-      } else {
-        throw new Error(result.error || 'Document verification failed');
-      }
-    } catch (error) {
-      console.error('Document upload error:', error);
-      logOrchestration('KYCError', { error: error.message });
-      
-      setMessages(prev => [...prev, {
-        id: `error-${Date.now()}`,
-        content: 'Failed to process document. Please try again.',
-        role: 'assistant',
-        type: 'error',
-        timestamp: new Date()
-      }]);
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
-  const getGroqSuggestions = async (context: string, data: any) => {
-    try {
-      logOrchestration('GroqRequest', { context, data });
-      
-      const response = await fetch('/api/groq/suggestions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context, data })
-      });
-      
-      const result = await response.json();
-      logOrchestration('GroqResponse', { context, result });
-      
-      return result.suggestions || [];
-    } catch (error) {
-      console.error('Error getting Groq suggestions:', error);
-      return [];
-    }
-  };
-
-  // Update the handleSubmit function in ChatInterface.tsx
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if ((!inputValue.trim() && !currentField?.startsWith('document_')) || !currentField) return;
-
-  // Log user input to orchestration
-  logOrchestration('UserInput', { 
-    field: currentField, 
-    value: currentField === 'address' ? '***' : inputValue // Mask sensitive data
-  });
-
-  // Add user message
-  const userMessage: ChatMessage = {
-    id: Date.now().toString(),
-    content: inputValue,
-    role: 'user',
-    type: 'text',
-    field: currentField,
-    timestamp: new Date()
-  };
-
-  setMessages(prev => [...prev, userMessage]);
-  setInputValue('');
-
-  // Process address through orchestration
-  if (currentField === 'address') {
-    try {
-      const response = await fetch('/api/orchestration/verify-address', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: inputValue })
-      });
-
-      const result = await response.json();
+      const result = await verifyAddress(address);
       
       if (result.valid) {
-        // Address is valid, proceed with the agent
-        agent.handleUserInput(inputValue, currentField);
+        // Address is valid
+        addBotMessage(`Great! I've verified your address: ${result.normalizedAddress}`);
+        // Pass the verified address to the agent
+       agent.handleUserInput(
+  `My address is ${result.normalizedAddress}`, 
+  'address'
+);
       } else {
-        // Show validation error
-        setMessages(prev => [...prev, {
-          id: `error-${Date.now()}`,
-          content: result.message || 'Please enter a valid address',
-          role: 'assistant',
-          type: 'error',
-          timestamp: new Date()
-        }]);
+        // Show suggestions for invalid address
+        const suggestions = result.suggestions?.length ? result.suggestions : [];
+        addBotMessage(
+          `I couldn't verify that address. ${result.error || 'Please try again.'}`,
+          suggestions
+        );
       }
     } catch (error) {
       console.error('Address verification error:', error);
-      setMessages(prev => [...prev, {
-        id: `error-${Date.now()}`,
-        content: 'Failed to verify address. Please try again.',
-        role: 'assistant',
-        type: 'error',
-        timestamp: new Date()
-      }]);
+      addBotMessage('Sorry, there was an error verifying your address. Please try again later.');
+    } finally {
+      setIsVerifying(false);
     }
-  } else {
-    // For non-address fields, proceed normally
-    agent.handleUserInput(inputValue, currentField);
+  };
+
+  // Helper to add bot messages
+  const addBotMessage = (content: string, suggestions: string[] = []) => {
+    const message: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content,
+      timestamp: new Date().toISOString(), // Ensure consistent string format
+      type: 'bot',
+      suggestions
+    };
+    setMessages(prev => [...prev, message]);
+  };
+
+  // Helper function to validate input based on field type
+  const validateInput = async (field: string, value: string): Promise<{ isValid: boolean; error?: string; suggestions?: string[] }> => {
+    const trimmedValue = value.trim();
+    
+    // Common validation patterns
+    const validations: Record<string, { pattern: RegExp; error: string; suggestions?: string[] }> = {
+      email: {
+        pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        error: 'Please enter a valid email address (e.g., user@example.com)',
+        suggestions: ['user@example.com', 'name@domain.com']
+      },
+      phone: {
+        pattern: /^[0-9]{10,15}$/,
+        error: 'Please enter a valid phone number (10-15 digits)',
+        suggestions: ['1234567890', '9876543210']
+      },
+      dateOfBirth: {
+        pattern: /^\d{4}-\d{2}-\d{2}$/,
+        error: 'Please enter a valid date in YYYY-MM-DD format',
+        suggestions: ['1990-01-01', '1985-12-31']
+      },
+      fullName: {
+        pattern: /^[a-zA-Z\s]{2,50}$/,
+        error: 'Please enter a valid full name (2-50 letters and spaces only)'
+      },
+      gender: {
+        pattern: /^(male|female|other|prefer not to say)$/i,
+        error: 'Please select a valid option',
+        suggestions: ['Male', 'Female', 'Other', 'Prefer not to say']
+      }
+    };
+
+    // Required field check
+    if (!trimmedValue) {
+      return {
+        isValid: false,
+        error: 'This field is required',
+        suggestions: validations[field]?.suggestions || []
+      };
+    }
+
+    // Apply specific validation if available
+    const validation = validations[field];
+    if (validation && !validation.pattern.test(trimmedValue)) {
+      try {
+        // Get AI-powered suggestions for invalid input
+        const aiResponse = await getAISuggestions(field, trimmedValue);
+        return {
+          isValid: false,
+          error: validation.error,
+          suggestions: [...new Set([
+            ...(validation.suggestions || []),
+            ...(aiResponse.suggestions || [])
+          ])].slice(0, 3) // Limit to 3 suggestions max
+        };
+      } catch (error) {
+        console.error('Error getting AI suggestions:', error);
+        // Fallback to default suggestions if AI service fails
+        return {
+          isValid: false,
+          error: validation.error,
+          suggestions: validation.suggestions || []
+        };
+      }
+    }
+
+    return { isValid: true };
+  };
+
+  // Handle form submission
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!inputValue.trim() || isVerifying) return;
+
+  const userInput = inputValue.trim();
+  
+  // Add user message to chat
+  const userMessage: ChatMessage = {
+    id: crypto.randomUUID(),
+    content: userInput,
+    role: 'user',
+    timestamp: new Date().toISOString(),
+    type: 'user',
+    suggestions: []
+  };
+  setMessages(prev => [...prev, userMessage]);
+  setInputValue('');
+
+  // If no current field is set, ask the user to answer the previous question
+  if (!currentField) {
+    addBotMessage('Please answer the previous question first.');
+    return;
+  }
+
+  try {
+    // Validate input before processing
+    const validation = await validateInput(currentField, userInput);
+    if (!validation.isValid) {
+      // Show error message with suggestions if available
+      const errorMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        content: validation.error || 'Invalid input',
+        role: 'assistant',
+        timestamp: new Date().toISOString(),
+        type: 'error',
+        suggestions: validation.suggestions || []
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      return;
+    }
+
+    // Process the input based on the current field
+    if (currentField === 'address') {
+      await handleAddressVerification(userInput);
+    } else {
+      agent.handleUserInput(userInput, currentField);
+    }
+  } catch (error) {
+    console.error('Error processing input:', error);
+    const errorMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      content: 'Sorry, something went wrong. Please try again.',
+      role: 'assistant',
+      timestamp: new Date().toISOString(),
+      type: 'error',
+      suggestions: []
+    };
+    setMessages(prev => [...prev, errorMessage]);
   }
 };
 
+  // Handle suggestion click
+  const handleSuggestionClick = (suggestion: string) => {
+    setInputValue(suggestion);
+    // Auto-submit the suggestion
+    const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+    // @ts-ignore - we need to dispatch the event
+    document.querySelector('form')?.dispatchEvent(submitEvent);
+  };
+
+  // Render messages with suggestions
   return (
-    <div className="flex flex-col h-[600px] max-w-2xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
-      {/* Messages */}
-      <div className="flex-1 p-4 overflow-y-auto">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`mb-4 flex ${
-              message.role === 'user' ? 'justify-end' : 'justify-start'
-            }`}
-          >
-            <div
-              className={`max-w-xs md:max-w-md lg:max-w-lg rounded-lg px-4 py-2 ${
-                message.role === 'user'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-800'
-              }`}
-            >
-              {message.content}
-              <div className="text-xs opacity-70 mt-1">
-                {formatTime(new Date(message.timestamp))}
-              </div>
+    <div className="chat-interface">
+      <div className="messages">
+        {messages.map((message, index) => (
+          <div 
+  key={index} 
+  className={`message ${message.type || 'text'}`.trim()}
+>
+  <div className="message-content">
+    {message.content}
+              {message.suggestions && message.suggestions.length > 0 && (
+                <div className="suggestions">
+                  <p>Did you mean:</p>
+                  {message.suggestions.map((suggestion, i) => (
+                    <div 
+                      key={i}
+                      className="suggestion"
+                      onClick={() => handleSuggestionClick(suggestion)}
+                    >
+                      {suggestion}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="message-time">
+              {formatTime(typeof message.timestamp === 'string' ? new Date(message.timestamp) : message.timestamp)}
             </div>
           </div>
         ))}
         <div ref={messagesEndRef} />
       </div>
-
-      {/* Document Upload Input */}
-      {currentField?.startsWith('document_') && (
-        <div className="p-4 border-t">
-          <input
-            type="file"
-            ref={fileInputRef}
-            accept="image/*,.pdf"
-            onChange={(e) => e.target.files?.[0] && handleDocumentUpload(e.target.files[0])}
-            className="hidden"
-            id="document-upload"
-            disabled={isUploading}
-          />
-          <label
-            htmlFor="document-upload"
-            className={`flex items-center justify-center p-4 border-2 border-dashed rounded-lg cursor-pointer ${
-              isUploading ? 'opacity-50' : 'hover:border-blue-500'
-            }`}
-          >
-            {isUploading ? (
-              <span className="text-gray-500">Uploading document...</span>
-            ) : (
-              <span className="text-gray-600">
-                Click or drag to upload {currentField.replace('document_', '')}
-              </span>
-            )}
-          </label>
-        </div>
-      )}
-
-      {/* Text Input */}
-      {!currentField?.startsWith('document_') && (
-        <form onSubmit={handleSubmit} className="p-4 border-t">
-          <div className="flex gap-2">
-            <input
-              type={currentField === 'email' ? 'email' : 'text'}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder={
-                currentField
-                  ? `Enter your ${currentField.replace('_', ' ')}...`
-                  : 'Type your message...'
-              }
-              className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={!currentField}
-            />
-            <button
-              type="submit"
-              disabled={!inputValue.trim() || !currentField}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg disabled:opacity-50"
-            >
-              Send
-            </button>
-          </div>
-        </form>
-      )}
+      <form onSubmit={handleSubmit} className="chat-input">
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder={currentField === 'address' ? 'Enter your address...' : 'Type your message...'}
+          disabled={isVerifying}
+        />
+        <button type="submit" disabled={isVerifying || !inputValue.trim()}>
+          {isVerifying ? 'Verifying...' : 'Send'}
+        </button>
+      </form>
     </div>
   );
 }
 
-export function ChatInterface() {
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Return a simple placeholder during SSR
-  if (!isMounted) {
-    return (
-      <div className="h-[600px] max-w-2xl mx-auto bg-white rounded-lg shadow-lg">
-        <div className="h-full flex items-center justify-center">
-          <p>Loading chat...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Render the actual chat interface on the client side
+// Wrap with any providers if needed
+export default function ChatInterface() {
   return <ClientSideChat />;
 }

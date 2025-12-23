@@ -24,3 +24,113 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.chat-interface {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+}
+
+.message {
+  margin-bottom: 1rem;
+  max-width: 80%;
+}
+
+.message.bot {
+  margin-right: auto;
+  text-align: left;
+}
+
+.message.user {
+  margin-left: auto;
+  text-align: right;
+}
+
+.message-content {
+  display: inline-block;
+  padding: 0.75rem 1rem;
+  border-radius: 1rem;
+  background: #f0f0f0;
+  max-width: 100%;
+  word-wrap: break-word;
+}
+
+.message.user .message-content {
+  background: #007bff;
+  color: white;
+}
+
+.suggestions {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: #f8f9fa;
+  border-radius: 0.5rem;
+  border-left: 3px solid #4a90e2;
+}
+
+.suggestions p {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9em;
+  color: #555;
+}
+
+.suggestion {
+  padding: 0.5rem;
+  margin: 0.25rem 0;
+  background: #e9f5ff;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.suggestion:hover {
+  background: #d0e3ff;
+}
+
+.chat-input {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+}
+
+.chat-input button {
+  padding: 0 1.5rem;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.chat-input button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.message-time {
+  font-size: 0.75rem;
+  color: #999;
+  margin-top: 0.25rem;
+}

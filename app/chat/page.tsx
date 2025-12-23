@@ -1,7 +1,7 @@
 // app/chat/page.tsx
 'use client';
 
-import { ChatInterface } from '@/components/ChatInterface/ChatInterface';
+import ChatInterface from '@/components/ChatInterface/ChatInterface';
 
 export default function ChatPage() {
   return (

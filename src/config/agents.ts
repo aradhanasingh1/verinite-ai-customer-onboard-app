@@ -2,7 +2,27 @@ interface LoanContext {
   creditScore: number;
   // Add other properties that might be used in the context
 }
+export interface AgentResponse {
+    status: 'success' | 'error';
+    message: string;
+    data?: Record<string, any>;
+    error?: any;
+}
+export interface AddressVerificationRequest {
+    address: string;
+    country?: string;
+    sessionId?: string;
+}
 
+export interface AddressVerificationResponse extends AgentResponse {
+    data?: {
+        isValid: boolean;
+        normalizedAddress?: string;
+        components?: Record<string, string>;
+        confidence?: number;
+        suggestions?: string[];
+    };
+}
 export const agentConfig = {
   userDetails: {
     requiredFields: ['fullName', 'gender', 'email', 'dateOfBirth', 'phone', 'address'],

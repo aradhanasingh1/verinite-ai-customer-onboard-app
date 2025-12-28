@@ -7,6 +7,8 @@ import { ChatMessage } from '@/types/chat';
 import { formatTime } from '@/utils/dateUtils';
 import { verifyAddress } from '@/services/addressVerificationService';
 import { getAISuggestions } from '@/services/aiSuggestionService';
+import { DocumentUpload } from '../DocumentUpload/DocumentUpload';
+import { uploadDocument, startOnboarding } from '@/services/documentService';
 
 interface Address {
   line1?: string;
@@ -23,7 +25,7 @@ function ClientSideChat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [currentField, setCurrentField] = useState<string | null>(null);
-
+const [showDocumentUpload, setShowDocumentUpload] = useState(false);
   // Initialize agent
   const [agent] = useState(() => {
     return new UserDetailsAgent((message) => {
@@ -64,6 +66,7 @@ const formatAddress = (address: Address | null | undefined): string => {
       
       if (result.valid) {
         // Address is valid
+        setShowDocumentUpload(true);
         addBotMessage(`Great! I've verified your address: ${result.normalizedAddress}`);
         // Pass the verified address to the agent
        agent.handleUserInput(
@@ -72,11 +75,16 @@ const formatAddress = (address: Address | null | undefined): string => {
 );
       } else {
         // Show suggestions for invalid address
-        const suggestions = result.suggestions?.length ? result.suggestions : [];
-        addBotMessage(
-          `I couldn't verify that address. ${result.error || 'Please try again.'}`,
-          suggestions
-        );
+      const suggestions = result.suggestions?.length 
+  ? result.suggestions.map(suggestion => 
+      typeof suggestion === 'string' ? suggestion : suggestion.formattedAddress || 
+      `${suggestion.line1}${suggestion.line2 ? ', ' + suggestion.line2 : ''}, ${suggestion.city}, ${suggestion.state} ${suggestion.postalCode}`
+    ) 
+  : [];
+addBotMessage(
+  `I couldn't verify that address. ${result.error || 'Please try again.'}`,
+  suggestions
+);
       }
     } catch (error) {
       console.error('Address verification error:', error);
@@ -87,7 +95,7 @@ const formatAddress = (address: Address | null | undefined): string => {
   };
 
   // Helper to add bot messages
-  const addBotMessage = (content: string, suggestions: string[] = []) => {
+const addBotMessage = (content: string, suggestions: string[] = []) => {
     const message: ChatMessage = {
       id: Date.now().toString(),
       role: 'assistant',
@@ -239,53 +247,97 @@ const handleSubmit = async (e: React.FormEvent) => {
     document.querySelector('form')?.dispatchEvent(submitEvent);
   };
 
-  // Render messages with suggestions
-  return (
-    <div className="chat-interface">
-      <div className="messages">
-        {messages.map((message, index) => (
-          <div 
-  key={index} 
-  className={`message ${message.type || 'text'}`.trim()}
->
-  <div className="message-content">
-    {message.content}
-              {message.suggestions && message.suggestions.length > 0 && (
-                <div className="suggestions">
-                  <p>Did you mean:</p>
-                  {message.suggestions.map((suggestion, i) => (
-                    <div 
-                      key={i}
-                      className="suggestion"
-                      onClick={() => handleSuggestionClick(suggestion)}
-                    >
-                      {suggestion}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="message-time">
-              {formatTime(typeof message.timestamp === 'string' ? new Date(message.timestamp) : message.timestamp)}
-            </div>
+const handleDocumentUpload = async (file: File, documentType: string) => {
+  try {
+    const uploadResponse = await uploadDocument(file, documentType, {
+      customerId: 'current-customer-id', // Replace with actual customer ID
+      applicationId: 'current-application-id' // Replace with actual application ID
+    });
+    // Start the onboarding process after successful upload
+    const onboardingResponse = await startOnboarding(uploadResponse.documentId);
+    
+    // Add a success message to the chat
+   setMessages(prev => [...prev, {
+  id: `doc-${Date.now()}`,
+  content: `Document (${documentType}) uploaded successfully! Starting verification...`,
+  role: 'assistant',
+  type: 'text', 
+  suggestions: [], 
+  timestamp: new Date().toISOString(),
+}]);
+    
+    return onboardingResponse;
+  } catch (error) {
+    console.error('Document upload failed:', error);
+    setMessages(prev => [...prev, {
+  id: `error-${Date.now()}`,
+  content: 'Failed to upload document. Please try again.',
+  role: 'assistant',
+  type: 'text', // Add this line
+  suggestions: [], // Add this line
+  timestamp: new Date().toISOString(),
+}]);
+    throw error;
+  }
+};
+ // In the ChatInterface component, update the return statement to this:
+return (
+  <div className="chat-interface">
+    <div className="messages">
+      {messages.map((message, index) => (
+        <div 
+          key={index} 
+          className={`message ${message.type || 'text'}`.trim()}
+        >
+          <div className="message-content">
+            {message.content}
           </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
-      <form onSubmit={handleSubmit} className="chat-input">
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          placeholder={currentField === 'address' ? 'Enter your address...' : 'Type your message...'}
+          <div className="message-time">
+            {formatTime(typeof message.timestamp === 'string' ? new Date(message.timestamp) : message.timestamp)}
+          </div>
+          {message.suggestions && message.suggestions.length > 0 && (
+            <div className="suggestions">
+              <p>Did you mean:</p>
+              {message.suggestions.map((suggestion, i) => (
+                <div 
+                  key={i}
+                  className="suggestion"
+                  onClick={() => handleSuggestionClick(suggestion)}
+                >
+                  {suggestion}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+      <div ref={messagesEndRef} />
+    </div>
+
+    {/* Show document upload after address verification */}
+    {showDocumentUpload && (
+      <div className="p-4 border-t">
+        <DocumentUpload 
+          onUpload={handleDocumentUpload} 
           disabled={isVerifying}
         />
-        <button type="submit" disabled={isVerifying || !inputValue.trim()}>
-          {isVerifying ? 'Verifying...' : 'Send'}
-        </button>
-      </form>
-    </div>
-  );
+      </div>
+    )}
+
+    <form onSubmit={handleSubmit} className="chat-input">
+      <input
+        type="text"
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        placeholder={currentField === 'address' ? 'Enter your address...' : 'Type your message...'}
+        disabled={isVerifying}
+      />
+      <button type="submit" disabled={isVerifying || !inputValue.trim()}>
+        {isVerifying ? 'Verifying...' : 'Send'}
+      </button>
+    </form>
+  </div>
+);
 }
 
 // Wrap with any providers if needed

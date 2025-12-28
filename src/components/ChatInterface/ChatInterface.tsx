@@ -343,7 +343,7 @@ const handleDocumentUpload = async (file: File, documentType: string) => {
               : finalDecision === 'DENY'
               ? '❌ Verification denied. Please review your document and try again.'
               : finalDecision === 'ESCALATE'
-              ? '⚠️ Verification requires manual review. We will contact you shortly.'
+              ? `⚠️ Verification requires manual review. We will contact you shortly.Status:  ${statusData.finalDecision} `
               : `📋 Verification status: ${finalDecision}`;
             
             setMessages(prev => [...prev, {

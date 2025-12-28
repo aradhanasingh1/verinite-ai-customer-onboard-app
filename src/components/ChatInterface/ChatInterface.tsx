@@ -12,6 +12,41 @@ import { uploadDocument, startOnboarding } from '@/services/documentService';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
+const DOCUMENT_TYPES = [
+  { value: 'passport', label: 'Passport' },
+  { value: 'drivers_license', label: "Driver's License" },
+  { value: 'aadhar', label: 'Aadhar Card' },
+  { value: 'utility_bill', label: 'Utility Bill' },
+  { value: 'bank_statement', label: 'Bank Statement' },
+];
+
+// File validation function
+const validateFile = (file: File, documentType: string): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+
+  // Check file size
+  if (file.size > MAX_FILE_SIZE) {
+    errors.push(`File size exceeds 10MB limit (current: ${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
+  }
+
+  // Check file type
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    errors.push(`Invalid file type. Allowed: PDF, JPG, PNG`);
+  }
+
+  // Document type-specific validations
+  if (documentType === 'passport' && !file.name.toLowerCase().includes('passport')) {
+    // Optional: warn if filename doesn't match document type
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
 interface Address {
   line1?: string;
   line2?: string | null;
@@ -251,15 +286,32 @@ const handleSubmit = async (e: React.FormEvent) => {
 
 const handleDocumentUpload = async (file: File, documentType: string) => {
   try {
-    const uploadResponse = await uploadDocument(file, documentType, {
+    // Validate file before upload
+    const fileValidation = validateFile(file, documentType);
+    if (!fileValidation.isValid) {
+      setMessages(prev => [...prev, {
+        id: `error-${Date.now()}`,
+        content: `Validation Error: ${fileValidation.errors.join(', ')}`,
+        role: 'assistant',
+        type: 'error',
+        suggestions: [],
+        timestamp: new Date().toISOString(),
+      }]);
+      return;
+    }
+
+    const context = {
       customerId: 'current-customer-id', // Replace with actual customer ID
       applicationId: 'current-application-id' // Replace with actual application ID
-    });
+    };
+
+    const uploadResponse = await uploadDocument(file, documentType, context);
     
-    // Add upload success message
+    // Add upload success message with document type info
+    const documentTypeLabel = DOCUMENT_TYPES.find(t => t.value === documentType)?.label || documentType;
     setMessages(prev => [...prev, {
       id: `doc-${Date.now()}`,
-      content: `Document (${documentType}) uploaded successfully! Starting verification...`,
+      content: `✅ ${documentTypeLabel} uploaded successfully! Starting verification...`,
       role: 'assistant',
       type: 'text', 
       suggestions: [], 
@@ -267,7 +319,7 @@ const handleDocumentUpload = async (file: File, documentType: string) => {
     }]);
     
     // Start the onboarding process after successful upload
-    const onboardingResponse = await startOnboarding(uploadResponse.documentId);
+    const onboardingResponse = await startOnboarding(uploadResponse.documentId, documentType, context);
     const traceId = onboardingResponse.traceId;
     
     if (traceId) {

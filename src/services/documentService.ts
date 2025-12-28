@@ -18,9 +18,17 @@ export const uploadDocument = async (file: File, documentType: string, context: 
   return response.data;
 };
 
-export const startOnboarding = async (documentId: string) => {
+export const startOnboarding = async (documentId: string, documentType?: string, context?: any) => {
   const response = await axios.post(`${API_BASE_URL}/onboarding/start`, {
     documentId,
+    documentType: documentType, // Pass document type
+    customerId: context?.customerId || 'current-customer-id',
+    applicationId: context?.applicationId || 'current-application-id',
+    payload: {
+      documentType: documentType,
+      documents: context?.documents || [],
+      applicant: context?.applicant || {}
+    },
     timestamp: new Date().toISOString(),
   });
   

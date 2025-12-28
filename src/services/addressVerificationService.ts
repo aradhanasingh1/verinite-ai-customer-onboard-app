@@ -78,20 +78,39 @@ export const verifyAddress = async (address: string): Promise<AddressVerificatio
           country: suggestion.country || suggestion.countryCode || 'US'
         })
       );
+      
+      const errorReason = response.reasons?.[0] || 
+                         response.data?.reasons?.[0] || 
+                         'Address could not be verified. Please check and try again.';
+      
+      // Check for Groq-related rejections
+      if (errorReason.toLowerCase().includes('groq') || 
+          response.verificationMethod === 'groq' || 
+          response.data?.verificationMethod === 'groq') {
+        console.warn('Address verification rejected by Groq:', { errorReason, response });
+      }
+      
       return {
         valid: false,
         suggestions,
-        error: response.reasons?.[0] || 
-              response.data?.reasons?.[0] || 
-              'Address could not be verified. Please check and try again.'
+        error: errorReason
       };
     }
   } catch (error) {
     console.error('Address verification error:', error);
+    let errorMessage = 'Failed to verify address';
+    if (error instanceof Error) {
+      errorMessage = `Address verification failed: ${error.message}`;
+      
+      // Check if the error is related to Groq
+      if (error.message.toLowerCase().includes('groq')) {
+        console.warn('Groq-related error in address verification:', error);
+      }
+    }
     return {
       valid: false,
       suggestions: [],
-      error: error instanceof Error ? error.message : 'Failed to verify address'
+      error: errorMessage
     };
   }
 };

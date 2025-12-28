@@ -10,6 +10,8 @@ import { getAISuggestions } from '@/services/aiSuggestionService';
 import { DocumentUpload } from '../DocumentUpload/DocumentUpload';
 import { uploadDocument, startOnboarding } from '@/services/documentService';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+
 interface Address {
   line1?: string;
   line2?: string | null;
@@ -253,30 +255,95 @@ const handleDocumentUpload = async (file: File, documentType: string) => {
       customerId: 'current-customer-id', // Replace with actual customer ID
       applicationId: 'current-application-id' // Replace with actual application ID
     });
+    
+    // Add upload success message
+    setMessages(prev => [...prev, {
+      id: `doc-${Date.now()}`,
+      content: `Document (${documentType}) uploaded successfully! Starting verification...`,
+      role: 'assistant',
+      type: 'text', 
+      suggestions: [], 
+      timestamp: new Date().toISOString(),
+    }]);
+    
     // Start the onboarding process after successful upload
     const onboardingResponse = await startOnboarding(uploadResponse.documentId);
+    const traceId = onboardingResponse.traceId;
     
-    // Add a success message to the chat
-   setMessages(prev => [...prev, {
-  id: `doc-${Date.now()}`,
-  content: `Document (${documentType}) uploaded successfully! Starting verification...`,
-  role: 'assistant',
-  type: 'text', 
-  suggestions: [], 
-  timestamp: new Date().toISOString(),
-}]);
+    if (traceId) {
+      // Poll for the final decision
+      const checkStatus = async (): Promise<void> => {
+        try {
+          const statusResponse = await fetch(`${API_BASE_URL}/onboarding/trace/${traceId}`);
+          const statusData = await statusResponse.json();
+          
+          if (statusData.status === 'completed') {
+            // Extract final decision from various possible locations
+            const finalDecision = statusData.finalDecision || 
+                                 statusData.result?.final || 
+                                 statusData.result?.data?.final ||
+                                 statusData.data?.final ||
+                                 'PENDING';
+            
+            // Display the final decision in chat
+            const decisionMessage = finalDecision === 'APPROVE' 
+              ? '✅ Verification approved! Your document has been verified successfully.'
+              : finalDecision === 'DENY'
+              ? '❌ Verification denied. Please review your document and try again.'
+              : finalDecision === 'ESCALATE'
+              ? '⚠️ Verification requires manual review. We will contact you shortly.'
+              : `📋 Verification status: ${finalDecision}`;
+            
+            setMessages(prev => [...prev, {
+              id: `decision-${Date.now()}`,
+              content: decisionMessage,
+              role: 'assistant',
+              type: 'text',
+              suggestions: [],
+              timestamp: new Date().toISOString(),
+            }]);
+          } else if (statusData.status === 'pending') {
+            // Still processing, check again after a delay
+            setTimeout(checkStatus, 1000);
+          } else {
+            // Error or unknown status
+            setMessages(prev => [...prev, {
+              id: `error-${Date.now()}`,
+              content: 'Verification status could not be determined. Please try again.',
+              role: 'assistant',
+              type: 'error',
+              suggestions: [],
+              timestamp: new Date().toISOString(),
+            }]);
+          }
+        } catch (error) {
+          console.error('Error checking verification status:', error);
+          setMessages(prev => [...prev, {
+            id: `error-${Date.now()}`,
+            content: 'Error checking verification status. Please try again later.',
+            role: 'assistant',
+            type: 'error',
+            suggestions: [],
+            timestamp: new Date().toISOString(),
+          }]);
+        }
+      };
+      
+      // Start polling after a short delay
+      setTimeout(checkStatus, 1000);
+    }
     
     return onboardingResponse;
   } catch (error) {
     console.error('Document upload failed:', error);
     setMessages(prev => [...prev, {
-  id: `error-${Date.now()}`,
-  content: 'Failed to upload document. Please try again.',
-  role: 'assistant',
-  type: 'text', // Add this line
-  suggestions: [], // Add this line
-  timestamp: new Date().toISOString(),
-}]);
+      id: `error-${Date.now()}`,
+      content: 'Failed to upload document. Please try again.',
+      role: 'assistant',
+      type: 'error',
+      suggestions: [],
+      timestamp: new Date().toISOString(),
+    }]);
     throw error;
   }
 };

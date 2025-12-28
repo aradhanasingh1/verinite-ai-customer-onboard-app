@@ -76,34 +76,48 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
       {documentType && (
         <div className="space-y-2">
           <label className="block text-sm font-medium">Upload {DOCUMENT_TYPES.find(t => t.value === documentType)?.label}</label>
-          <div className="flex items-center space-x-2">
-            <label className="flex-1">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                accept=".pdf,.jpg,.jpeg,.png"
-                className="hidden"
-                disabled={disabled || isUploading}
-              />
-              <div className="flex items-center justify-center p-4 border-2 border-dashed rounded-md cursor-pointer hover:bg-gray-50">
-                {selectedFile ? (
-                  <div className="flex items-center space-x-2">
-                    <FileText className="h-5 w-5" />
-                    <span className="truncate max-w-xs">{selectedFile.name}</span>
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <Upload className="h-5 w-5 mx-auto mb-1" />
-                    <p className="text-sm">Click to upload or drag and drop</p>
-                    <p className="text-xs text-muted-foreground">
-                      PDF, JPG, or PNG (max 10MB)
-                    </p>
-                  </div>
-                )}
+          
+          <label 
+            htmlFor="file-upload"
+            className={`relative flex flex-col items-center justify-center p-4 border rounded-md text-sm font-medium transition-colors cursor-pointer 
+              ${
+                selectedFile 
+                  ? 'bg-blue-50 border-blue-500 text-blue-700' 
+                  : 'border-gray-300 hover:bg-gray-50'
+              }`}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                fileInputRef.current?.click();
+              }
+            }}
+          >
+            <input
+              id="file-upload"
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".pdf,.jpg,.jpeg,.png"
+              className="sr-only" // Use sr-only for better accessibility
+              disabled={disabled || isUploading}
+            />
+            
+            {selectedFile ? (
+              <div className="flex items-center space-x-2">
+                <FileText className="h-5 w-5" />
+                <span className="truncate max-w-xs">{selectedFile.name}</span>
               </div>
-            </label>
-          </div>
+            ) : (
+              <div className="text-center">
+                <Upload className="h-5 w-5 mx-auto mb-1" />
+                <p className="text-sm">Click to upload or drag and drop</p>
+                <p className="text-xs text-muted-foreground">
+                  PDF, JPG, or PNG (max 10MB)
+                </p>
+              </div>
+            )}
+          </label>
         </div>
       )}
 

@@ -64,7 +64,17 @@ export class FeedbackProvider {
       phone: 'Phone Number',
       dateOfBirth: 'Date of Birth',
       gender: 'Gender',
-      address: 'Full Address'
+      aadhaarNumber: 'Aadhaar Number',
+      address: 'Full Address',
+      employmentStatus: 'Employment Status',
+      employerName: 'Employer/Business',
+      jobTitle: 'Job Title',
+      annualIncome: 'Annual Income',
+      payFrequency: 'Pay Frequency',
+      housingStatus: 'Housing Status',
+      housingPayment: 'Monthly Housing Payment',
+      cardPreference: 'Card Preference',
+      consent: 'Consent'
     };
     return labels[field] || this.formatFieldName(field);
   }

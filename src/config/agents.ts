@@ -25,7 +25,24 @@ export interface AddressVerificationResponse extends AgentResponse {
 }
 export const agentConfig = {
   userDetails: {
-    requiredFields: ['fullName', 'gender', 'email', 'dateOfBirth', 'phone', 'address'],
+    requiredFields: [
+      'fullName',
+      'gender',
+      'email',
+      'phone',
+      'dateOfBirth',
+      'aadhaarNumber',
+      'address',
+      'employmentStatus',
+      'employerName',
+      'jobTitle',
+      'annualIncome',
+      'payFrequency',
+      'housingStatus',
+      'housingPayment',
+      'cardPreference',
+      'consent'
+    ],
     validationRules: {
       fullName: { 
         required: true, 
@@ -58,10 +75,71 @@ export const agentConfig = {
         pattern: /^\d{10}$/,
         error: 'Please enter a valid 10-digit phone number'
       },
+      aadhaarNumber: {
+        required: true,
+        pattern: /^\d{12}$/,
+        error: 'Enter a 12-digit Aadhaar number (numbers only)'
+      },
       address: { 
         required: true, 
         minLength: 10,
         error: 'Please enter a valid address (at least 10 characters)'
+      },
+      employmentStatus: {
+        required: true,
+        validate: (value: string) =>
+          ['employed', 'self-employed', 'student', 'unemployed', 'retired'].includes(value.toLowerCase()),
+        error: 'Select a valid employment status option'
+      },
+      employerName: {
+        required: true,
+        minLength: 2,
+        error: 'Please enter your employer or business name'
+      },
+      jobTitle: {
+        required: true,
+        minLength: 2,
+        error: 'Please enter your job title or role'
+      },
+      annualIncome: {
+        required: true,
+        validate: (value: string) => {
+          const income = parseFloat(value.replace(/[^0-9.]/g, ''));
+          return !isNaN(income) && income > 0;
+        },
+        error: 'Enter your annual income as a number'
+      },
+      payFrequency: {
+        required: true,
+        validate: (value: string) =>
+          ['monthly', 'bi-weekly', 'weekly', 'semi-monthly', 'annual'].includes(value.toLowerCase()),
+        error: 'Select a valid pay frequency option'
+      },
+      housingStatus: {
+        required: true,
+        validate: (value: string) =>
+          ['own', 'rent', 'family', 'other'].includes(value.toLowerCase()),
+        error: 'Select a valid housing status option'
+      },
+      housingPayment: {
+        required: true,
+        validate: (value: string) => {
+          const payment = parseFloat(value.replace(/[^0-9.]/g, ''));
+          return !isNaN(payment) && payment >= 0;
+        },
+        error: 'Enter your monthly housing payment as a number (0 allowed if none)'
+      },
+      cardPreference: {
+        required: true,
+        validate: (value: string) =>
+          ['cashback', 'travel', 'low apr', 'no preference'].includes(value.toLowerCase()),
+        error: 'Choose a card preference (cashback, travel, low APR, or no preference)'
+      },
+      consent: {
+        required: true,
+        validate: (value: string) =>
+          ['yes', 'y', 'agree', 'i agree', 'approve'].includes(value.toLowerCase()),
+        error: 'Please confirm consent to run a credit check (reply yes to proceed)'
       }
     }
   },

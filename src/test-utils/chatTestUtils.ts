@@ -1,14 +1,17 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { jest } from '@jest/globals';
+import { createElement } from 'react';
+import * as RTL from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ChatInterface } from '@/components/ChatInterface/ChatInterface';
+import type { MockedClass } from 'jest-mock';
+import ChatInterface from '@/components/ChatInterface/ChatInterface';
 import { UserDetailsAgent } from '@/agents/userDetails/UserDetailsAgent';
-import { vi, Mock } from 'vitest';
+import type { ChatMessage } from '@/types/chat';
 
 // Mock the UserDetailsAgent
-vi.mock('@/agents/userDetails/UserDetailsAgent');
+jest.mock('@/agents/userDetails/UserDetailsAgent');
 
 // Mock the agent configuration
-vi.mock('@/config/agents', () => ({
+jest.mock('@/config/agents', () => ({
   agentConfig: {
     userDetails: {
       requiredFields: ['name', 'email', 'address', 'document'],
@@ -23,29 +26,29 @@ vi.mock('@/config/agents', () => ({
 }));
 
 export const setupChatTest = () => {
-  const mockOnMessage = vi.fn();
-  const mockHandleUserInput = vi.fn();
+  const mockOnMessage = jest.fn();
+  const mockHandleUserInput = jest.fn(async (_content: string, _field: string) => undefined);
+  const mockGetCollectedData = jest.fn(() => ({} as ReturnType<UserDetailsAgent['getCollectedData']>));
 
   // Mock UserDetailsAgent implementation
-  (UserDetailsAgent as unknown as Mock).mockImplementation((onMessage) => {
-    return {
-      handleUserInput: mockHandleUserInput,
-      onMessage: (msg: any) => {
-        mockOnMessage(msg);
-        onMessage(msg);
-      }
-    };
-  });
+  (UserDetailsAgent as unknown as MockedClass<typeof UserDetailsAgent>).mockImplementation(
+    (_onMessage: (message: ChatMessage) => void) =>
+      ({
+        handleUserInput: mockHandleUserInput,
+        getCollectedData: mockGetCollectedData
+      } as unknown as jest.Mocked<UserDetailsAgent>)
+  );
 
-  const utils = render(<ChatInterface />);
+  const utils = RTL.render(createElement(ChatInterface));
   
   return {
     ...utils,
     mockHandleUserInput,
     mockOnMessage,
+    mockGetCollectedData,
     user: userEvent.setup(),
     // Helper to simulate agent message
-    simulateAgentMessage: (message: any) => {
+    simulateAgentMessage: (message: Partial<ChatMessage>) => {
       mockOnMessage({
         id: `msg-${Date.now()}`,
         role: 'assistant',
@@ -56,9 +59,13 @@ export const setupChatTest = () => {
     },
     // Helper to send user message
     sendUserMessage: async (text: string) => {
-      const input = screen.getByRole('textbox');
-      await user.type(input, text);
-      fireEvent.submit(screen.getByRole('form'));
+      const input = utils.getByRole('textbox');
+      await userEvent.type(input, text);
+      const form = utils.container.querySelector('form');
+      if (!form) {
+        throw new Error('Chat form not found');
+      }
+      RTL.fireEvent.submit(form);
     }
   };
 };

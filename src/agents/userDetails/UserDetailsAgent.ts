@@ -53,6 +53,9 @@ export class UserDetailsAgent {
 
   constructor(onMessage: (message: ChatMessage) => void) {
     this.onMessage = onMessage;
+  }
+
+  public initialize() {
     this.initializeConversation();
   }
 
@@ -65,8 +68,8 @@ export class UserDetailsAgent {
   }
 
   private createMessage(
-    content: string, 
-    type: ChatMessage['type'], 
+    content: string,
+    type: ChatMessage['type'],
     field?: string,
     suggestions?: string[]
   ): ChatMessage {
@@ -112,22 +115,22 @@ export class UserDetailsAgent {
 
     const config = this.fieldConfigs[field];
     const prompt = this.getFieldPrompt(field);
-    
+
     const message = this.createMessage(
       prompt,
       'question',
       field,
       config?.type === 'select' ? config.options : undefined
     );
-    
+
     this.onMessage(message);
   }
 
   async handleUserInput(content: string, field: string): Promise<void> {
     // Validate the input
     const error = FeedbackProvider.getValidationError(
-      field, 
-      content, 
+      field,
+      content,
       agentConfig.userDetails.validationRules
     );
 
@@ -155,6 +158,23 @@ export class UserDetailsAgent {
       setTimeout(() => this.askForNextField(), 500);
     } else {
       this.onComplete();
+    }
+  }
+
+  // Method to send collected data to backend session
+  async syncToBackendSession(sessionId: string, apiBaseUrl: string): Promise<void> {
+    try {
+      const response = await fetch(`${apiBaseUrl}/chat/session/${sessionId}/sync-slots`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slots: this.collectedData })
+      });
+      
+      if (!response.ok) {
+        console.warn('Failed to sync data to backend session');
+      }
+    } catch (error) {
+      console.error('Error syncing to backend session:', error);
     }
   }
 

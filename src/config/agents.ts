@@ -3,47 +3,47 @@ interface LoanContext {
   // Add other properties that might be used in the context
 }
 export interface AgentResponse {
-    status: 'success' | 'error';
-    message: string;
-    data?: Record<string, any>;
-    error?: any;
+  status: 'success' | 'error';
+  message: string;
+  data?: Record<string, any>;
+  error?: any;
 }
 export interface AddressVerificationRequest {
-    address: string;
-    country?: string;
-    sessionId?: string;
+  address: string;
+  country?: string;
+  sessionId?: string;
 }
 
 export interface AddressVerificationResponse extends AgentResponse {
-    data?: {
-        isValid: boolean;
-        normalizedAddress?: string;
-        components?: Record<string, string>;
-        confidence?: number;
-        suggestions?: string[];
-    };
+  data?: {
+    isValid: boolean;
+    normalizedAddress?: string;
+    components?: Record<string, string>;
+    confidence?: number;
+    suggestions?: string[];
+  };
 }
 export const agentConfig = {
   userDetails: {
     requiredFields: ['fullName', 'gender', 'email', 'dateOfBirth', 'phone', 'address'],
     validationRules: {
-      fullName: { 
-        required: true, 
+      fullName: {
+        required: true,
         minLength: 2,
         error: 'Please enter your full name (at least 2 characters)'
       },
-      gender: { 
+      gender: {
         required: true,
-        validate: (value: string) => 
+        validate: (value: string) =>
           ['male', 'female', 'other', 'prefer not to say'].includes(value.toLowerCase()),
         error: 'Please select a valid gender option'
       },
-      email: { 
-        required: true, 
+      email: {
+        required: true,
         pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
         error: 'Please enter a valid email address'
       },
-      dateOfBirth: { 
+      dateOfBirth: {
         required: true,
         validate: (value: string) => {
           const dob = new Date(value);
@@ -53,13 +53,13 @@ export const agentConfig = {
         },
         error: 'You must be at least 18 years old'
       },
-      phone: { 
-        required: true, 
+      phone: {
+        required: true,
         pattern: /^\d{10}$/,
         error: 'Please enter a valid 10-digit phone number'
       },
-      address: { 
-        required: true, 
+      address: {
+        required: true,
         minLength: 10,
         error: 'Please enter a valid address (at least 10 characters)'
       }

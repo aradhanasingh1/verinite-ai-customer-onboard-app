@@ -30,7 +30,7 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
 
   const handleUpload = async () => {
     if (!selectedFile || !documentType) return;
-    
+
     try {
       setIsUploading(true);
       await onUpload(selectedFile, documentType);
@@ -51,20 +51,19 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
   };
 
   return (
-    <div className="space-y-4 p-4 border rounded-lg bg-white">
+    <div className="space-y-4 p-5 rounded-2xl bg-white/50 backdrop-blur-sm shadow-inner transition-all border border-indigo-50/50">
       <div>
-        <h3 className="text-sm font-medium mb-2">Select Document Type</h3>
+        <h3 className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider px-1">Choose Verification Document</h3>
         <div className="grid grid-cols-2 gap-2">
           {DOCUMENT_TYPES.map((type) => (
             <button
               key={type.value}
               type="button"
               onClick={() => handleDocumentTypeSelect(type.value)}
-              className={`p-3 border rounded-md text-sm font-medium transition-colors ${
-                documentType === type.value
-                  ? 'bg-blue-50 border-blue-500 text-blue-700'
-                  : 'border-gray-300 hover:bg-gray-50'
-              }`}
+              className={`p-3 border-2 rounded-xl text-xs font-bold transition-all duration-200 ${documentType === type.value
+                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-100'
+                  : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200 hover:bg-slate-50'
+                }`}
               disabled={disabled || isUploading}
             >
               {type.label}
@@ -74,16 +73,17 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
       </div>
 
       {documentType && (
-        <div className="space-y-2">
-          <label className="block text-sm font-medium">Upload {DOCUMENT_TYPES.find(t => t.value === documentType)?.label}</label>
-          
-          <label 
+        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider px-1">
+            Upload {DOCUMENT_TYPES.find(t => t.value === documentType)?.label}
+          </label>
+
+          <label
             htmlFor="file-upload"
-            className={`relative flex flex-col items-center justify-center p-4 border rounded-md text-sm font-medium transition-colors cursor-pointer 
-              ${
-                selectedFile 
-                  ? 'bg-blue-50 border-blue-500 text-blue-700' 
-                  : 'border-gray-300 hover:bg-gray-50'
+            className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-2xl text-sm font-medium transition-all cursor-pointer 
+              ${selectedFile
+                ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
+                : 'border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/30 text-slate-500'
               }`}
             tabIndex={0}
             onKeyDown={(e) => {
@@ -99,22 +99,27 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
               ref={fileInputRef}
               onChange={handleFileChange}
               accept=".pdf,.jpg,.jpeg,.png"
-              className="sr-only" // Use sr-only for better accessibility
+              className="sr-only"
               disabled={disabled || isUploading}
             />
-            
+
             {selectedFile ? (
-              <div className="flex items-center space-x-2">
-                <FileText className="h-5 w-5" />
-                <span className="truncate max-w-xs">{selectedFile.name}</span>
+              <div className="flex flex-col items-center space-y-2">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <span className="truncate max-w-[200px] font-semibold">{selectedFile.name}</span>
+                <span className="text-[10px] opacity-70">Click to change file</span>
               </div>
             ) : (
-              <div className="text-center">
-                <Upload className="h-5 w-5 mx-auto mb-1" />
-                <p className="text-sm">Click to upload or drag and drop</p>
-                <p className="text-xs text-muted-foreground">
-                  PDF, JPG, or PNG (max 10MB)
-                </p>
+              <div className="text-center space-y-2">
+                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mx-auto transition-colors group-hover:bg-indigo-100">
+                  <Upload className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold">Files up to 10MB</p>
+                  <p className="text-[10px] opacity-60 uppercase tracking-tighter">PDF • JPG • PNG</p>
+                </div>
               </div>
             )}
           </label>
@@ -124,15 +129,21 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
       <Button
         onClick={handleUpload}
         disabled={!selectedFile || !documentType || disabled || isUploading}
-        className="w-full"
+        className={`w-full h-11 rounded-xl font-bold transition-all shadow-lg ${selectedFile && documentType
+            ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200 active:scale-[0.98]'
+            : 'bg-slate-100 text-slate-400'
+          }`}
       >
         {isUploading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Uploading...
-          </>
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Processing...</span>
+          </div>
         ) : (
-          'Upload Document'
+          <div className="flex items-center justify-center gap-2">
+            <Upload className="h-4 w-4" />
+            <span>Verify Document</span>
+          </div>
         )}
       </Button>
     </div>

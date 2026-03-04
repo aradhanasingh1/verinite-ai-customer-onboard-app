@@ -19,8 +19,8 @@ interface DocumentRequirement {
 
 export class FeedbackProvider {
   static getValidationError(
-    field: string, 
-    value: string, 
+    field: string,
+    value: string,
     rules: ValidationRules
   ): string | null {
     const rule = rules[field];

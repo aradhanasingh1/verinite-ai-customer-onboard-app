@@ -85,7 +85,7 @@ export const addressVerificationApi = {
             city: addressData.address?.city || '',
             state: addressData.address?.state || '',
             postalCode: addressData.address?.postalCode || '',
-            country: addressData.address?.country || 'US'
+            country: addressData.address?.country || ''
           }
         },
         {

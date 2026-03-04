@@ -13,7 +13,7 @@ export const getAISuggestions = async (field: string, value: string): Promise<AI
         city: '',
         state: '',
         postalCode: '',
-        country: 'US'  // Default, adjust as needed
+        country: ' '  // Default, adjust as needed
       });
       return {
         suggestions: response.data.suggestions || [],

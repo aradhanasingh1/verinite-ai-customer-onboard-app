@@ -1,6 +1,15 @@
 // In addressVerificationService.ts
 import { addressVerificationApi } from './apiClient';
 
+export interface SimpleAddress {
+  line1: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+}
+
 export interface AddressSuggestion {
   line1: string;
   line2?: string;
@@ -25,7 +34,7 @@ function formatSuggestion(suggestion: Partial<AddressSuggestion>): AddressSugges
     city: suggestion.city || '',
     state: suggestion.state || '',
     postalCode: suggestion.postalCode || '',
-    country: suggestion.country || 'US',
+    country: suggestion.country || '',
     // Create a nicely formatted display string
     formattedAddress: [
       suggestion.line1,
@@ -37,27 +46,33 @@ function formatSuggestion(suggestion: Partial<AddressSuggestion>): AddressSugges
   return formatted;
 }
 
-export const verifyAddress = async (address: string): Promise<AddressVerificationResult> => {
+export const verifyAddress = async (addressData: SimpleAddress): Promise<AddressVerificationResult> => {
   try {
-    console.log('Verifying address:', address);
-    const response = await addressVerificationApi.verifyAddress({
+    console.log('Verifying address object:', addressData);
+
+    // Ensure all fields are present as strings (even if empty) to satisfy backend expectation
+    const payload = {
       address: {
-        line1: address,
-        city: '',
-        state: '',
-        postalCode: '',
-        country: 'US'
+        line1: addressData.line1 || '',
+        city: addressData.city || '',
+        state: addressData.state || '',
+        postalCode: addressData.postalCode || '',
+        country: addressData.country || ''
       }
-    });
-    
+    };
+
+    console.log('[FRONTEND] DEBUG: Address data being sent:', JSON.stringify(payload, null, 2));
+
+    const response = await addressVerificationApi.verifyAddress(payload);
+
     console.log('Verification response:', response);
-    
+
     if (response.verified === true || response.proposal === 'approve') {
-      const normalized = response.normalizedAddress || 
-                       (response.data?.normalizedAddress ? 
-                         formatAddress(response.data.normalizedAddress) : 
-                         address);
-      
+      const normalized = response.normalizedAddress ||
+        (response.data?.normalizedAddress ?
+          formatAddress(response.data.normalizedAddress) :
+          addressData.line1);
+
       return {
         valid: true,
         normalizedAddress: normalized,
@@ -66,30 +81,30 @@ export const verifyAddress = async (address: string): Promise<AddressVerificatio
     } else {
       // Get raw suggestions from either root level or nested in data
       const rawSuggestions = response.suggestions || response.data?.suggestions || [];
-      
+
       // Format all suggestions using our helper
-      const suggestions = rawSuggestions.map((suggestion: any) => 
+      const suggestions = rawSuggestions.map((suggestion: any) =>
         formatSuggestion({
           line1: suggestion.line1 || suggestion.addressLine1 || '',
           line2: suggestion.line2 || suggestion.addressLine2,
           city: suggestion.city || suggestion.locality || '',
           state: suggestion.state || suggestion.region || '',
           postalCode: suggestion.postalCode || suggestion.postal || suggestion.postalCode || '',
-          country: suggestion.country || suggestion.countryCode || 'US'
+          country: suggestion.country || suggestion.countryCode || ''
         })
       );
-      
-      const errorReason = response.reasons?.[0] || 
-                         response.data?.reasons?.[0] || 
-                         'Address could not be verified. Please check and try again.';
-      
+
+      const errorReason = response.reasons?.[0] ||
+        response.data?.reasons?.[0] ||
+        'Address could not be verified. Please check and try again.';
+
       // Check for Groq-related rejections
-      if (errorReason.toLowerCase().includes('groq') || 
-          response.verificationMethod === 'groq' || 
-          response.data?.verificationMethod === 'groq') {
+      if (errorReason.toLowerCase().includes('groq') ||
+        response.verificationMethod === 'groq' ||
+        response.data?.verificationMethod === 'groq') {
         console.warn('Address verification rejected by Groq:', { errorReason, response });
       }
-      
+
       return {
         valid: false,
         suggestions,
@@ -101,7 +116,7 @@ export const verifyAddress = async (address: string): Promise<AddressVerificatio
     let errorMessage = 'Failed to verify address';
     if (error instanceof Error) {
       errorMessage = `Address verification failed: ${error.message}`;
-      
+
       // Check if the error is related to Groq
       if (error.message.toLowerCase().includes('groq')) {
         console.warn('Groq-related error in address verification:', error);
@@ -118,7 +133,7 @@ export const verifyAddress = async (address: string): Promise<AddressVerificatio
 function formatAddress(addr: any): string {
   if (!addr) return '';
   if (typeof addr === 'string') return addr;
-  
+
   const parts = [
     addr.line1,
     addr.line2,
@@ -127,7 +142,7 @@ function formatAddress(addr: any): string {
     addr.postalCode,
     addr.country
   ].filter(Boolean);
-  
+
   return parts.join(', ');
 }
 // For API route usage

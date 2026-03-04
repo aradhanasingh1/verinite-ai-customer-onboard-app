@@ -9,8 +9,7 @@ export async function POST(request: Request) {
     const file = formData.get('document') as File | null;
     
     const response = await addressVerificationApi.verifyAddress(
-      addressData,
-      file || undefined
+      addressData
     );
     
     return NextResponse.json(response);

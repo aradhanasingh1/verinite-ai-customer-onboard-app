@@ -580,9 +580,14 @@ export default function AuditTrailPage() {
     };
 
     // Group steps by category for section dividers
+    // Filter to show only completed and failed steps (exclude pending and in_progress)
+    const filteredSteps = (session?.steps || []).filter(step => 
+        step.status === 'completed' || step.status === 'failed'
+    );
+    
     const groupedSteps: { step: AuditStep; showDivider: boolean }[] = [];
     let lastCat = '';
-    (session?.steps || []).forEach((step) => {
+    filteredSteps.forEach((step) => {
         groupedSteps.push({ step, showDivider: step.category !== lastCat });
         lastCat = step.category;
     });
@@ -739,7 +744,7 @@ export default function AuditTrailPage() {
                         {/* Nav quick links */}
                         <div className="flex gap-2 text-xs flex-wrap">
                             <span className="text-slate-500 font-semibold uppercase tracking-wider self-center">Jump to:</span>
-                            {Array.from(new Set(session.steps.map(s => s.category))).map(cat => {
+                            {Array.from(new Set(filteredSteps.map(s => s.category))).map(cat => {
                                 const meta = CATEGORY_META[cat];
                                 return (
                                     <a
@@ -757,7 +762,7 @@ export default function AuditTrailPage() {
                         <div className="rounded-2xl bg-white/3 border border-white/8 p-4 sm:p-6">
                             <div className="flex items-center justify-between mb-6">
                                 <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">
-                                    📋 Journey Timeline — {session.steps.length} Steps
+                                    📋 Journey Timeline — {filteredSteps.length} Steps
                                 </h2>
                                 {useVirtualization && (
                                     <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded-full border border-indigo-500/40">

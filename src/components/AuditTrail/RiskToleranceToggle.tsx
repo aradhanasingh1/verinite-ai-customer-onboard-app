@@ -134,7 +134,7 @@ export function RiskToleranceToggle({
         {/* Current status indicator */}
         <div className="flex items-center gap-2">
           <span className={`text-sm font-semibold ${isHigh ? 'text-emerald-600' : 'text-amber-600'}`}>
-            {isHigh ? 'Auto-Approve' : 'Manual Review'}
+            {isHigh ? 'High' : 'Low'}
           </span>
         </div>
       </div>

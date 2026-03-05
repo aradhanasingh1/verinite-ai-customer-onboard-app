@@ -62,6 +62,9 @@ Create a `.env` file in the root directory with the following variables:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:5000
+GROQ_API_KEY=your_groq_api_key
+GROQ_OCR_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
+GROQ_KYC_EXTRACTION_MODEL=openai/gpt-oss-120b
 # Add other environment variables as needed
 ```
 

@@ -54,7 +54,7 @@ const SuccessStep: React.FC<SuccessStepProps> = ({ onNewSubmission, finalDecisio
       )}
 
       {/* ── Audit trail CTA ── */}
-      <div className="pt-2 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50 p-4">
+      {/* <div className="pt-2 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50 p-4">
         <div className="text-sm font-semibold text-indigo-800 mb-1">🔍 View Your Journey</div>
         <p className="text-xs text-indigo-600 mb-3">
           See a complete step-by-step record of your onboarding process, verifications performed, and current status.
@@ -68,7 +68,7 @@ const SuccessStep: React.FC<SuccessStepProps> = ({ onNewSubmission, finalDecisio
           </svg>
           Open Audit Trail
         </Link>
-      </div>
+      </div> */}
 
       {/* New application */}
       <button

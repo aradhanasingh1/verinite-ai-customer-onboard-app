@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import MultiStepForm from '../src/components/Form';
 import { RiskToleranceToggle } from '../src/components/AuditTrail/RiskToleranceToggle';
 import { getCurrentSession, getRiskToleranceAsync, determineApplicationStatus } from '../src/lib/auditStore';
 import type { RiskToleranceLevel } from '../src/types/audit';
@@ -98,6 +97,15 @@ export default function CustomerOnboardingPage() {
                 Home
               </Link>
               <Link
+                href="/form"
+                className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-indigo-400 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h4m-4 4h4m-4-8h4m-4 12h.01M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Form
+              </Link>
+              <Link
                 href="/chat"
                 className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-indigo-400 transition-colors"
               >
@@ -125,18 +133,32 @@ export default function CustomerOnboardingPage() {
         <div className="max-w-2xl mx-auto px-6 space-y-3">
 
           {/* ── Welcome Banner ── */}
-          <div className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 p-6 shadow-xl text-white">
+          {/* <div className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 p-6 shadow-xl text-white">
             <h2 className="text-2xl font-bold mb-2">Welcome to Verinite Onboarding</h2>
             <p className="text-indigo-100 text-sm">
               Complete your customer verification process with our AI-powered onboarding system.
             </p>
+          </div> */}
+
+          {/* ── Top nav bar with Form link ── */}
+          <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-4 shadow-lg gap-4 flex-wrap backdrop-blur-sm">
+            <div>
+              <div className="text-sm font-semibold text-white">Try the form-based onboarding</div>
+              <div className="text-xs text-slate-400">Multi-step form with document upload & verification</div>
+            </div>
+            <Link
+              href="/form"
+              className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition-colors shadow-lg shadow-violet-500/20"
+            >
+              Open Form →
+            </Link>
           </div>
 
-          {/* ── Top nav bar ── */}
+          {/* ── Chat demo banner ── */}
           <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-4 shadow-lg gap-4 flex-wrap backdrop-blur-sm">
             <div>
               <div className="text-sm font-semibold text-white">Try the conversational demo</div>
-              <div className="text-xs text-slate-400">Chat UI + Aadhaar upload, backed by the orchestrator (port 4000)</div>
+              <div className="text-xs text-slate-400">Chat UI + Document upload, backed by the orchestrator</div>
             </div>
             <Link
               href="/chat"
@@ -191,7 +213,6 @@ export default function CustomerOnboardingPage() {
           </div>
 
         </div>
-        <MultiStepForm />
       </div>
     </div>
   );

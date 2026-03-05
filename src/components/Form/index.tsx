@@ -300,7 +300,7 @@ const MultiStepForm: React.FC = () => {
 
       console.log('Submitting form with payload:', formattedPayload);
 
-      // Get risk tolerance from localStorage
+     // Get risk tolerance from localStorage
       let riskTolerance = 'HIGH'; // Default to HIGH for auto-approval
       if (typeof window !== 'undefined') {
         const stored = localStorage.getItem('verinite_default_risk_tolerance');
@@ -309,7 +309,7 @@ const MultiStepForm: React.FC = () => {
         }
       }
       console.log('Using risk tolerance:', riskTolerance);
-
+      
       recordStep(
         'additional_info_complete',
         'Financial & Document Details Submitted',

@@ -7,6 +7,9 @@ import type { AuditSession, StepStatus } from '@/lib/auditStore';
 import type { AuditStep, RiskToleranceLevel } from '@/types/audit';
 import { RiskToleranceToggle } from '@/components/AuditTrail/RiskToleranceToggle';
 import { TreeView } from '@/components/AuditTrail/TreeView';
+import { DecisionFlowDiagram, extractDecisionFlow } from '@/components/AuditTrail/DecisionFlowDiagram';
+import { StateMachineFlow, extractStateMachineFlow } from '@/components/AuditTrail/StateMachineFlow';
+import { parseLegacyMetadataToSteps, hasLegacyMetadata, extractFinalDecision } from '@/utils/legacyMetadataParser';
 
 // ─── Step category metadata ───────────────────────────────────────────────────
 const CATEGORY_META: Record<string, { label: string; gradient: string; glow: string }> = {
@@ -495,6 +498,33 @@ export default function AuditTrailPage() {
 
     const load = useCallback(() => {
         const currentSession = getCurrentSession();
+        
+        // Parse legacy metadata if present and inject steps
+        if (currentSession) {
+            const legacyStep = currentSession.steps.find(s => hasLegacyMetadata(s));
+            
+            if (legacyStep && legacyStep.metadata) {
+                // Parse legacy metadata into audit steps
+                const parsedSteps = parseLegacyMetadataToSteps(legacyStep.metadata, currentSession.sessionId);
+                
+                if (parsedSteps.length > 0) {
+                    // Remove the legacy step and replace with parsed steps
+                    const otherSteps = currentSession.steps.filter(s => s.id !== legacyStep.id);
+                    currentSession.steps = [...otherSteps, ...parsedSteps].sort((a, b) => 
+                        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+                    );
+                    
+                    // Extract final decision if not already set
+                    if (!currentSession.finalDecision) {
+                        const finalDecision = extractFinalDecision(legacyStep.metadata);
+                        if (finalDecision) {
+                            currentSession.finalDecision = finalDecision;
+                        }
+                    }
+                }
+            }
+        }
+        
         setSession(currentSession);
         // Enable virtualization for >100 steps
         setUseVirtualization((currentSession?.steps.length || 0) > 100);
@@ -651,6 +681,39 @@ export default function AuditTrailPage() {
                     <div className="space-y-6">
                         {/* Status card */}
                         <StatusCard session={session} />
+
+                        {/* State Machine Flow - Show if legacy metadata exists */}
+                        {(() => {
+                            // Check if any step has legacy metadata with state machine
+                            const legacyStep = session.steps.find(s => s.metadata && typeof s.metadata === 'object');
+                            const stateMachineData = legacyStep ? extractStateMachineFlow(legacyStep.metadata) : null;
+                            
+                            if (stateMachineData) {
+                                return (
+                                    <div className="rounded-2xl bg-white/3 border border-white/8 p-4 sm:p-6">
+                                        <StateMachineFlow
+                                            history={stateMachineData.history}
+                                            finalDecision={stateMachineData.finalDecision}
+                                        />
+                                    </div>
+                                );
+                            }
+                            
+                            // Fallback to Decision Flow Diagram if no legacy metadata but has agent steps
+                            if (session.finalDecision && session.steps.some(s => s.agentMetadata && s.agentName !== 'legacy')) {
+                                return (
+                                    <div className="rounded-2xl bg-white/3 border border-white/8 p-4 sm:p-6">
+                                        <DecisionFlowDiagram
+                                            steps={extractDecisionFlow(session.steps)}
+                                            finalDecision={session.finalDecision as 'APPROVE' | 'DENY' | 'ESCALATE' | 'PENDING'}
+                                            riskTolerance={riskTolerance || undefined}
+                                        />
+                                    </div>
+                                );
+                            }
+                            
+                            return null;
+                        })()}
 
                         {/* Risk Tolerance Toggle - positioned prominently after status card */}
                         {/* {!loadingRiskTolerance && (

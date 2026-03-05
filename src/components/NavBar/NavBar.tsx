@@ -10,7 +10,7 @@ export function NavBar() {
       <div className="flex items-center gap-4">
         <Link href="/" className="flex items-center gap-2 text-lg font-bold hover:text-indigo-400 transition-colors">
           <img src="/verinite-logo.png" alt="Verinite" className="h-6 w-auto object-contain" />
-          Onboarding App
+          Onboarding Bot
         </Link>
       </div>
       <div className="flex items-center gap-6">

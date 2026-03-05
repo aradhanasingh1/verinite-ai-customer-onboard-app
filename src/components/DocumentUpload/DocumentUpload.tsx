@@ -76,20 +76,20 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
   };
 
   return (
-    <div className="space-y-4 p-5 rounded-2xl bg-white shadow-sm border border-slate-200 transition-all">
+    <div className="p-5 rounded-2xl bg-white shadow-sm border border-slate-200 transition-all">
       <div>
-        <h3 className="text-xs font-bold text-slate-600 mb-3 uppercase tracking-wider px-1">
+        <h3 className="text-xs font-bold text-slate-600 uppercase px-1">
           Upload KYC Document
         </h3>
-        <p className="text-xs text-slate-500 px-1 mb-3">
+        <p className="text-xs text-slate-500 px-1">
           Upload any identity document (Aadhaar, Passport, Driver's License, etc.)
         </p>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-0">
         <label
           htmlFor="file-upload"
-          className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-2xl text-sm font-medium transition-all cursor-pointer 
+          className={`relative flex flex-col items-center justify-center px-6 border-2 border-dashed rounded-2xl text-sm font-medium transition-all cursor-pointer 
             ${selectedFile
               ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
               : 'border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/30 text-slate-600'
@@ -114,7 +114,7 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
 
           {selectedFile ? (
             <div className="flex flex-col items-center space-y-2">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+              <div className="w-10 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
                 <FileText className="h-5 w-5 text-emerald-600" />
               </div>
               <span className="truncate max-w-[200px] font-semibold text-slate-800">{selectedFile.name}</span>

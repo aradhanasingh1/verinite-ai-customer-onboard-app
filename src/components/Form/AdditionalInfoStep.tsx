@@ -117,7 +117,7 @@ const AdditionalInfoStep: React.FC<FormStepProps> = ({ formData, handleChange, e
         {errors?.idType && <span className="text-red-500 text-xs">{errors.idType}</span>}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-700">
             Occupation *
@@ -189,7 +189,7 @@ const AdditionalInfoStep: React.FC<FormStepProps> = ({ formData, handleChange, e
             <option value="other">Other</option>
           </select>
         </div>
-      </div>
+      </div> */}
 
       <div className="mt-6">
         <div className="flex items-start">

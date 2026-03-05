@@ -14,14 +14,14 @@ export function NavBar() {
         </Link>
       </div>
       <div className="flex items-center gap-6">
-        <Link href="/" className="flex items-center gap-2 text-sm font-medium hover:text-indigo-400 transition-colors">
-          <MessageSquare size={18} />
-          Chat
+        <Link href="/form" className="flex items-center gap-2 text-sm font-medium hover:text-indigo-400 transition-colors">
+          {/* <MessageSquare size={18} /> */}
+          <u>Form</u>
         </Link>
-        <Link href="/audit-trail" className="flex items-center gap-2 text-sm font-medium hover:text-indigo-400 transition-colors">
+        {/* <Link href="/audit-trail" className="flex items-center gap-2 text-sm font-medium hover:text-indigo-400 transition-colors">
           
           Admin Dashboard
-        </Link>
+        </Link> */}
       </div>
     </nav>
   );

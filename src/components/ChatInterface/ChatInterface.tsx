@@ -393,7 +393,7 @@ function ClientSideChat() {
       }
 
       // IMPORTANT: Sync collected data to backend session BEFORE uploading document
-      // This ensures the backend can use user's chat data as mock extracted fields
+      // This ensures the backend has the user's chat data available
       if (currentSessionId) {
         const collectedData = agent.getCollectedData();
         console.log('[ChatInterface] Syncing collected data to backend:', collectedData);
@@ -410,29 +410,11 @@ function ClientSideChat() {
         }
       }
 
-      const collectedData = agent.getCollectedData();
-      const dummyExtractedFields = {
-        fullName: "Atmaram Kirumanjeswara Parameshwara",
-        dateOfBirth: "1981-12-10",
-        idNumber: "P1234567",
-        idType: documentType,
-        gender: "Male",
-        address: "107A, Meenakshi Classic APT, 27th Main, HSR Layout Sector 1, Bengaluru, 560102, Karnataka, India"
-      };
-      const context = {
-        customerId: 'current-customer-id', // Replace with actual customer ID
-        applicationId: 'current-application-id', // Replace with actual application ID
-        applicant: collectedData,
-        payload: {
-          extractedFields: dummyExtractedFields // Inject dummy data here
-        }
-      };
-
       // Add upload success message with document type info
       const documentTypeLabel = DOCUMENT_TYPES.find(t => t.value === documentType)?.label || documentType;
       setMessages(prev => [...prev, {
         id: `upload-${Date.now()}`,
-        content: `📄 Document uploaded: ${documentTypeLabel}\n\nVerifying your ${documentTypeLabel.toLowerCase()}...`,
+        content: `📄 Document uploaded: ${documentTypeLabel}\n\nExtracting information from your ${documentTypeLabel.toLowerCase()}...`,
         role: 'assistant',
         type: 'text',
         timestamp: new Date().toISOString(),
@@ -443,6 +425,53 @@ function ClientSideChat() {
 
       const uploadResponse = await uploadDocument(file, currentSessionId || ''); // Pass sessionId
       const documentId = uploadResponse.attachmentId; // Extract documentId from upload response
+
+      // Extract and display document information from the actual OCR/PDF parsing
+      if (uploadResponse.pendingConfirmation) {
+        const extractedFields = uploadResponse.pendingConfirmation;
+        const docInfo: string[] = [];
+        
+        if (extractedFields.fullName) {
+          docInfo.push(`• Name: ${extractedFields.fullName}`);
+        }
+        if (extractedFields.dateOfBirth) {
+          docInfo.push(`• Date of Birth: ${extractedFields.dateOfBirth}`);
+        } else if (extractedFields.yearOfBirth) {
+          docInfo.push(`• Year of Birth: ${extractedFields.yearOfBirth}`);
+        }
+        
+        // Display document ID based on type
+        if (extractedFields.idNumber) {
+          const idType = extractedFields.idType || documentType;
+          let idLabel = 'Document Number';
+          if (idType === 'aadhaar') {
+            idLabel = 'Aadhaar Number';
+          } else if (idType === 'passport') {
+            idLabel = 'Passport Number';
+          } else if (idType === 'drivers_license') {
+            idLabel = 'License Number';
+          }
+          
+          // Use masked version if available, otherwise show full number
+          const idValue = extractedFields.idNumberMasked || extractedFields.idNumber;
+          docInfo.push(`• ${idLabel}: ${idValue}`);
+        }
+        
+        if (extractedFields.gender) {
+          docInfo.push(`• Gender: ${extractedFields.gender}`);
+        }
+        
+        if (docInfo.length > 0) {
+          setMessages(prev => [...prev, {
+            id: `doc-info-${Date.now()}`,
+            content: `📋 Document Information:\n${docInfo.join('\n')}`,
+            role: 'assistant',
+            type: 'text',
+            timestamp: new Date().toISOString(),
+            suggestions: []
+          }]);
+        }
+      }
 
       recordStep('doc_upload_success', 'Upload Success', `File ${file.name} uploaded successfully.`, 'documents', 'completed', { icon: '✅', detail: `ID: ${documentId}` });
       recordStep('kyc_start', 'KYC Orchestration', 'Handing over to Multi-Agent Orchestrator for full verification.', 'kyc', 'in_progress', { icon: '🧠', metadata: { agentSelection } });
@@ -455,6 +484,18 @@ function ClientSideChat() {
             body: JSON.stringify({ confirmed: true }) // Assuming auto-confirmation for now
           });
         }
+
+        // Build context with actual extracted fields from the document
+        const collectedData = agent.getCollectedData();
+        const extractedFields = uploadResponse.pendingConfirmation || {};
+        const context = {
+          customerId: 'current-customer-id',
+          applicationId: 'current-application-id',
+          applicant: collectedData,
+          payload: {
+            extractedFields: extractedFields // Use actual extracted fields from OCR/PDF parsing
+          }
+        };
 
         // Get the current risk tolerance from the audit store
         const session = getCurrentSession();
@@ -683,7 +724,7 @@ function ClientSideChat() {
       )}
 
       {/* Messages Area */}
-      <div className="messages flex-1 overflow-y-auto p-4 space-y-4 bg-white">
+      <div className="messages flex-1 overflow-y-auto p-4 bg-white">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-4 opacity-70">
             <div className="p-6 bg-indigo-50 rounded-3xl shadow-sm">
@@ -770,7 +811,7 @@ function ClientSideChat() {
             <CheckCircle2 size={14} />
             Step 2: Document Verification
           </div>
-          <div className="upload-overlay p-1">
+          <div className="upload-overlay">
             <DocumentUpload
               onUpload={handleDocumentUpload}
               disabled={isVerifying}

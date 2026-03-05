@@ -705,17 +705,17 @@ export default function AuditTrailPage() {
                             }
                             
                             // Fallback to Decision Flow Diagram if no legacy metadata but has agent steps
-                            if (session.finalDecision && session.steps.some(s => s.agentMetadata && s.agentName !== 'legacy')) {
-                                return (
-                                    <div className="rounded-2xl bg-white/3 border border-white/8 p-4 sm:p-6">
-                                        <DecisionFlowDiagram
-                                            steps={extractDecisionFlow(session.steps)}
-                                            finalDecision={session.finalDecision as 'APPROVE' | 'DENY' | 'ESCALATE' | 'PENDING'}
-                                            riskTolerance={riskTolerance || undefined}
-                                        />
-                                    </div>
-                                );
-                            }
+                            // if (session.finalDecision && session.steps.some(s => s.agentMetadata && s.agentName !== 'legacy')) {
+                            //     return (
+                            //         <div className="rounded-2xl bg-white/3 border border-white/8 p-4 sm:p-6">
+                            //             <DecisionFlowDiagram
+                            //                 steps={extractDecisionFlow(session.steps)}
+                            //                 finalDecision={session.finalDecision as 'APPROVE' | 'DENY' | 'ESCALATE' | 'PENDING'}
+                            //                 riskTolerance={riskTolerance || undefined}
+                            //             />
+                            //         </div>
+                            //     );
+                            // }
                             
                             return null;
                         })()}

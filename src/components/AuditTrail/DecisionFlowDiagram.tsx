@@ -79,7 +79,7 @@ export function DecisionFlowDiagram({ steps, finalDecision, riskTolerance }: Dec
   return (
     <div className="space-y-6">
       {/* Title */}
-      {/* <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
           🔄
         </div>
@@ -87,7 +87,7 @@ export function DecisionFlowDiagram({ steps, finalDecision, riskTolerance }: Dec
           <h3 className="text-lg font-bold text-white">Decision Flow</h3>
           <p className="text-xs text-slate-400">Step-by-step verification process</p>
         </div>
-      </div> */}
+      </div>
 
       {/* Risk Tolerance Badge */}
       {riskTolerance && (

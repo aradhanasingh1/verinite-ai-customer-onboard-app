@@ -9,19 +9,12 @@ import { ChatMessage } from '@/types/chat';
 import { formatTime } from '@/utils/dateUtils';
 import { verifyAddress } from '@/services/addressVerificationService';
 import { getAISuggestions } from '@/services/aiSuggestionService';
+import { verifyDocument } from '@/services/kycService';
 import { DocumentUpload } from '../DocumentUpload/DocumentUpload';
 import { uploadDocument, startOnboarding } from '@/services/documentService';
 import { recordStep, finaliseAudit, startAuditSession, setApplicantName, getCurrentSession, getRiskToleranceAsync } from '@/lib/auditStore';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-
-const DOCUMENT_TYPES = [
-  { value: 'passport', label: 'Passport' },
-  { value: 'drivers_license', label: "Driver's License" },
-  { value: 'aadhaar', label: 'Aadhar Card' },
-  { value: 'utility_bill', label: 'Utility Bill' },
-  { value: 'bank_statement', label: 'Bank Statement' },
-];
 
 // File validation function
 const validateFile = (file: File, documentType: string): { isValid: boolean; errors: string[] } => {
@@ -392,17 +385,57 @@ function ClientSideChat() {
         return;
       }
 
-      // IMPORTANT: Sync collected data to backend session BEFORE uploading document
-      // This ensures the backend can use user's chat data as mock extracted fields
+      const collectedData = agent.getCollectedData();
+
+      const parsedDocument = await verifyDocument(file, documentType);
+      const parsedExtractedData = parsedDocument.success ? parsedDocument.extractedData : undefined;
+      const parsedVerificationFields = parsedDocument.success
+        ? (parsedDocument.verificationFields || {})
+        : {};
+
+      if (parsedDocument.success && parsedExtractedData) {
+        const parsedLines = [
+          parsedExtractedData.documentType ? `Type: ${parsedExtractedData.documentType}` : null,
+          parsedExtractedData.name ? `Name: ${parsedExtractedData.name}` : null,
+          parsedExtractedData.idNumber ? `ID Number: ${parsedExtractedData.idNumber}` : null,
+        ].filter(Boolean);
+
+        setMessages(prev => [...prev, {
+          id: `ocr-${Date.now()}`,
+          content: parsedLines.length
+            ? `Document parsed for KYC:\n${parsedLines.join('\n')}`
+            : 'Document parsed, but no major KYC fields were confidently extracted.',
+          role: 'assistant',
+          type: 'info',
+          suggestions: [],
+          timestamp: new Date().toISOString(),
+        }]);
+      } else {
+        setMessages(prev => [...prev, {
+          id: `ocr-warning-${Date.now()}`,
+          content: `Could not extract structured KYC fields from this document: ${parsedDocument.error || 'Unknown parsing error'}`,
+          role: 'assistant',
+          type: 'info',
+          suggestions: [],
+          timestamp: new Date().toISOString(),
+        }]);
+      }
+
+      // Sync enriched slots before upload so backend orchestration can use OCR output.
       if (currentSessionId) {
-        const collectedData = agent.getCollectedData();
-        console.log('[ChatInterface] Syncing collected data to backend:', collectedData);
-        
+        const enrichedSlots = {
+          ...collectedData,
+          ...(parsedExtractedData?.name ? { fullName: parsedExtractedData.name } : {}),
+          ...(parsedExtractedData?.idNumber ? { idNumber: parsedExtractedData.idNumber } : {}),
+          ...(parsedExtractedData?.documentType ? { idType: parsedExtractedData.documentType } : {}),
+        };
+        console.log('[ChatInterface] Syncing collected+OCR data to backend:', enrichedSlots);
+
         try {
           await fetch(`${API_BASE_URL}/chat/session/${currentSessionId}/sync-slots`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ slots: collectedData })
+            body: JSON.stringify({ slots: enrichedSlots })
           });
           console.log('[ChatInterface] Successfully synced data to backend session');
         } catch (syncError) {
@@ -410,26 +443,21 @@ function ClientSideChat() {
         }
       }
 
-      const collectedData = agent.getCollectedData();
-      const dummyExtractedFields = {
-        fullName: "Atmaram Kirumanjeswara Parameshwara",
-        dateOfBirth: "1981-12-10",
-        idNumber: "P1234567",
-        idType: documentType,
-        gender: "Male",
-        address: "107A, Meenakshi Classic APT, 27th Main, HSR Layout Sector 1, Bengaluru, 560102, Karnataka, India"
-      };
       const context = {
         customerId: 'current-customer-id', // Replace with actual customer ID
         applicationId: 'current-application-id', // Replace with actual application ID
         applicant: collectedData,
         payload: {
-          extractedFields: dummyExtractedFields // Inject dummy data here
+          extractedFields: {
+            ...parsedVerificationFields,
+            idType:
+              parsedExtractedData?.documentType ||
+              parsedVerificationFields.idType ||
+              documentType,
+          }
         }
       };
 
-      // Add upload success message with document type info
-      const documentTypeLabel = DOCUMENT_TYPES.find(t => t.value === documentType)?.label || documentType;
       setMessages(prev => [...prev, {
         id: `upload-${Date.now()}`,
         content: `Uploading ${file.name}...`,

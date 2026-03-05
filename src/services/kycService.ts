@@ -1,8 +1,28 @@
+export interface KYCExtractedField {
+  key: string;
+  value: string;
+  confidence: number | null;
+}
+
 export interface KYCDocumentResult {
   success: boolean;
   documentType?: string;
-  extractedData?: Record<string, any>;
+  documentTypeConfidence?: number | null;
+  extractedData?: {
+    name: string | null;
+    documentType: string;
+    idNumber: string | null;
+    rawText: string;
+    fields: KYCExtractedField[];
+  };
+  verificationFields?: Record<string, string>;
+  modelInfo?: {
+    ocrModel: string;
+    extractionModel: string;
+  };
+  warnings?: string[];
   error?: string;
+  statusCode?: number;
 }
 
 export const verifyDocument = async (file: File, documentType: string): Promise<KYCDocumentResult> => {
@@ -15,17 +35,22 @@ export const verifyDocument = async (file: File, documentType: string): Promise<
       method: 'POST',
       body: formData,
     });
-    
+
+    const responseJson = (await response.json()) as KYCDocumentResult;
     if (!response.ok) {
-      throw new Error('Document verification failed');
+      return {
+        success: false,
+        error: responseJson.error || 'Document verification failed',
+        statusCode: response.status,
+      };
     }
-    
-    return await response.json();
+
+    return responseJson;
   } catch (error) {
     console.error('Document verification error:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to verify document' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to verify document',
     };
   }
 };

@@ -432,15 +432,24 @@ function ClientSideChat() {
         console.log('[ChatInterface] Syncing collected+OCR data to backend:', enrichedSlots);
 
         try {
-          await fetch(`${API_BASE_URL}/chat/session/${currentSessionId}/sync-slots`, {
+          const syncResponse = await fetch(`${API_BASE_URL}/chat/session/${currentSessionId}/sync-slots`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ slots: enrichedSlots })
           });
-          console.log('[ChatInterface] Successfully synced data to backend session');
+          
+          if (!syncResponse.ok) {
+            console.warn('[ChatInterface] Sync failed with status:', syncResponse.status);
+            const errorText = await syncResponse.text();
+            console.warn('[ChatInterface] Sync error response:', errorText);
+          } else {
+            console.log('[ChatInterface] Successfully synced data to backend session');
+          }
         } catch (syncError) {
           console.warn('[ChatInterface] Failed to sync data, continuing with upload:', syncError);
         }
+      } else {
+        console.warn('[ChatInterface] No session ID available, skipping sync');
       }
 
       const context = {
@@ -467,9 +476,23 @@ function ClientSideChat() {
         suggestions: []
       }]);
 
+      // Ensure we have a valid session before uploading
+      if (!currentSessionId) {
+        console.error('[ChatInterface] No session ID available for upload');
+        setMessages(prev => [...prev, {
+          id: `error-${Date.now()}`,
+          content: 'Session not initialized. Please refresh the page and try again.',
+          role: 'assistant',
+          type: 'error',
+          suggestions: [],
+          timestamp: new Date().toISOString(),
+        }]);
+        return;
+      }
+
       recordStep('doc_upload_start', 'Upload Started', `Uploading ${documentType.toUpperCase()}: ${file.name}`, 'documents', 'in_progress', { icon: '📤' });
 
-      const uploadResponse = await uploadDocument(file, currentSessionId || ''); // Pass sessionId
+      const uploadResponse = await uploadDocument(file, currentSessionId); // Pass sessionId
       const documentId = uploadResponse.attachmentId; // Extract documentId from upload response
 
       recordStep('doc_upload_success', 'Upload Success', `File ${file.name} uploaded successfully.`, 'documents', 'completed', { icon: '✅', detail: `ID: ${documentId}` });
@@ -477,11 +500,19 @@ function ClientSideChat() {
 
       // Confirm the extracted details with the orchestrator to save them to session.slots
         if (uploadResponse.pendingConfirmation && currentSessionId) {
-          await fetch(`${API_BASE_URL}/chat/session/${currentSessionId}/confirm`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ confirmed: true }) // Assuming auto-confirmation for now
-          });
+          try {
+            const confirmResponse = await fetch(`${API_BASE_URL}/chat/session/${currentSessionId}/confirm`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ confirmed: true }) // Assuming auto-confirmation for now
+            });
+            
+            if (!confirmResponse.ok) {
+              console.warn('[ChatInterface] Confirm failed with status:', confirmResponse.status);
+            }
+          } catch (confirmError) {
+            console.warn('[ChatInterface] Failed to confirm, continuing:', confirmError);
+          }
         }
 
         // Get the current risk tolerance from the audit store

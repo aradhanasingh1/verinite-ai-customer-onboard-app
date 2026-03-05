@@ -683,13 +683,13 @@ function ClientSideChat() {
       )}
 
       {/* Messages Area */}
-      <div className="messages flex-1 overflow-y-auto p-4 space-y-4 bg-slate-900">
+      <div className="messages flex-1 overflow-y-auto p-4 space-y-4 bg-white">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-4 opacity-70">
-            <div className="p-6 bg-white/5 backdrop-blur-sm rounded-3xl shadow-lg border border-white/10">
-              <Bot size={48} className="text-indigo-400" />
+            <div className="p-6 bg-indigo-50 rounded-3xl shadow-sm">
+              <Bot size={48} className="text-indigo-500" />
             </div>
-            <p className="text-sm font-medium text-slate-300">Hello! I'm here to help with your onboarding.</p>
+            <p className="text-sm font-medium text-slate-700">Hello! I'm here to help with your onboarding.</p>
           </div>
         )}
 
@@ -702,11 +702,11 @@ function ClientSideChat() {
               {message.role === 'assistant' && (
                 <div className="flex-shrink-0 mt-1">
                   {message.type === 'error' ? (
-                    <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center">
-                      <AlertCircle size={16} className="text-red-400" />
+                    <div className="w-6 h-6 rounded-full bg-red-50 flex items-center justify-center">
+                      <AlertCircle size={16} className="text-red-500" />
                     </div>
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400">
+                    <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
                       <Bot size={14} />
                     </div>
                   )}
@@ -718,20 +718,20 @@ function ClientSideChat() {
                   message.role === 'user' 
                     ? 'bg-emerald-600 text-white ml-auto max-w-[85%]' 
                     : message.type === 'error'
-                    ? 'bg-red-500/10 text-red-300 border border-red-500/30'
-                    : 'bg-white/5 text-slate-200 border border-white/10'
+                    ? 'bg-red-50 text-red-700 border border-red-200'
+                    : 'bg-slate-50 text-slate-800 border border-slate-200'
                 }`}>
                   {message.content}
                 </div>
 
-                <div className={`message-time text-[10px] text-slate-500 mt-1 ${message.role === 'user' ? 'text-right' : ''}`}>
+                <div className={`message-time text-[10px] text-slate-400 mt-1 ${message.role === 'user' ? 'text-right' : ''}`}>
                   {formatTime(typeof message.timestamp === 'string' ? new Date(message.timestamp) : message.timestamp)}
                 </div>
               </div>
 
               {message.role === 'user' && (
                 <div className="flex-shrink-0 mt-1">
-                  <div className="w-6 h-6 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600">
+                  <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
                     <User size={14} />
                   </div>
                 </div>
@@ -740,7 +740,7 @@ function ClientSideChat() {
 
             {message.suggestions && message.suggestions.length > 0 && (
               <div className="suggestions mt-3 pl-8">
-                <div className="suggestion-label flex items-center gap-1 text-xs text-slate-400 mb-2">
+                <div className="suggestion-label flex items-center gap-1 text-xs text-slate-500 mb-2">
                   <Info size={12} />
                   <span>Quick reply</span>
                 </div>
@@ -749,7 +749,7 @@ function ClientSideChat() {
                     <button
                       key={i}
                       type="button"
-                      className="suggestion bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 hover:border-indigo-500/50 px-3 py-1.5 rounded-lg text-xs transition-all hover:scale-105 active:scale-95"
+                      className="suggestion bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200 hover:border-indigo-300 px-3 py-1.5 rounded-lg text-xs transition-all hover:scale-105 active:scale-95 shadow-sm"
                       onClick={() => handleSuggestionClick(suggestion)}
                     >
                       {suggestion}
@@ -765,8 +765,8 @@ function ClientSideChat() {
 
       {/* Document Upload Section */}
       {showDocumentUpload && (
-        <div className="px-4 py-3 bg-slate-900/80 backdrop-blur-md border-t border-white/10">
-          <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-indigo-400 uppercase tracking-wider">
+        <div className="px-4 py-3 bg-white border-t border-slate-200">
+          <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-indigo-600 uppercase tracking-wider">
             <CheckCircle2 size={14} />
             Step 2: Document Verification
           </div>
@@ -781,7 +781,7 @@ function ClientSideChat() {
 
       {/* Input Area - Hidden when completed */}
       {!showDocumentUpload && !isCompleted && (
-        <form onSubmit={handleSubmit} className="p-4 bg-slate-900/80 backdrop-blur-md border-t border-white/10 flex items-center gap-2">
+        <form onSubmit={handleSubmit} className="p-4 bg-white border-t border-slate-200 flex items-center gap-2">
           <div className="relative flex-1 group">
             <input
               type="text"
@@ -789,18 +789,18 @@ function ClientSideChat() {
               onChange={(e) => setInputValue(e.target.value)}
               placeholder={currentField === 'address' ? 'e.g. 123 Main St, Bengaluru, Karnataka, India' : 'Type your message...'}
               disabled={isVerifying}
-              className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all placeholder:text-slate-500"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400"
             />
             {isVerifying && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
               </div>
             )}
           </div>
           <button
             type="submit"
             disabled={isVerifying || !inputValue.trim()}
-            className="flex items-center justify-center w-11 h-11 rounded-xl bg-indigo-600 text-white disabled:opacity-50 disabled:bg-slate-700 transition-all hover:bg-indigo-500 hover:shadow-lg hover:shadow-indigo-500/25 active:scale-95 shadow-md"
+            className="flex items-center justify-center w-11 h-11 rounded-xl bg-indigo-600 text-white disabled:opacity-50 disabled:bg-slate-300 transition-all hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-500/25 active:scale-95 shadow-md"
             aria-label="Send message"
           >
             <Send size={18} />

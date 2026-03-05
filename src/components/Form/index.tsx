@@ -12,7 +12,10 @@ import {
   recordStep,
   finaliseAudit,
   setApplicantName,
+  getCurrentSession,
+  getRiskToleranceAsync,
 } from '@/lib/auditStore';
+import type { RiskToleranceLevel } from '@/types/audit';
 
 const MultiStepForm: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -318,10 +321,57 @@ const MultiStepForm: React.FC = () => {
         { icon: '⚙️' }
       );
 
+      // Get the current risk tolerance from the audit store
+      const session = getCurrentSession();
+      let riskToleranceValue = 'high'; // Default to high for auto-approval
+      let riskToleranceLevel: RiskToleranceLevel = 'HIGH';
+      if (session?.sessionId) {
+        try {
+          const riskTolerance = await getRiskToleranceAsync(session.sessionId);
+          if (riskTolerance) {
+            riskToleranceValue = riskTolerance.toLowerCase();
+            riskToleranceLevel = riskTolerance;
+            console.log(`[Form] Using risk tolerance: ${riskToleranceValue}`);
+            
+            // Record audit step showing risk tolerance is being applied
+            const riskDescription = riskToleranceLevel === 'HIGH'
+              ? 'Applying HIGH risk tolerance: Will auto-approve if all checks pass.'
+              : 'Applying LOW risk tolerance: Will escalate for manual review.';
+            
+            recordStep(
+              'risk_tolerance_applied',
+              `Risk Tolerance Applied: ${riskToleranceLevel}`,
+              riskDescription,
+              'risk',
+              'completed',
+              {
+                icon: riskToleranceLevel === 'HIGH' ? '🚀' : '🛡️',
+                detail: riskToleranceLevel === 'HIGH' 
+                  ? 'Decision Rule: HIGH + All Checks Pass → APPROVE' 
+                  : 'Decision Rule: LOW → ESCALATE (Manual Review)',
+                metadata: {
+                  level: riskToleranceLevel,
+                  appliedAt: new Date().toISOString(),
+                  expectedBehavior: riskToleranceLevel === 'HIGH'
+                    ? 'Auto-approve on success'
+                    : 'Manual review required'
+                }
+              }
+            );
+          }
+        } catch (error) {
+          console.warn('[Form] Failed to get risk tolerance, using default (high):', error);
+        }
+      }
+
       const response = await axios.post('http://localhost:4000/onboarding/start', {
         customerId: `cust-${Date.now()}`,
         applicationId: `app-${Date.now()}`,
-        payload: formattedPayload
+        payload: {
+          ...formattedPayload,
+          risk_tolerance: riskToleranceValue, // Add risk tolerance inside payload
+          riskProfile: riskToleranceValue // Also add as riskProfile for compatibility
+        }
       });
 
       const newTraceId = response.data.traceId;
@@ -349,40 +399,129 @@ const MultiStepForm: React.FC = () => {
 
             setFinalDecision(decision);
 
-            // ── Record final agent decisions in audit ──────────────────
-            const auditTrail = statusResponse.data.auditTrail || [];
-            const agentChecks = [
-              { key: 'kyc', label: 'KYC Verification', cat: 'kyc' as const, icon: '🪪' },
-              { key: 'aml', label: 'AML Screening', cat: 'aml' as const, icon: '🔎' },
-              { key: 'credit', label: 'Credit Assessment', cat: 'credit' as const, icon: '💳' },
-              { key: 'risk', label: 'Risk Evaluation', cat: 'risk' as const, icon: '⚖️' },
-            ];
-            agentChecks.forEach(({ key, label, cat, icon }) => {
-              const found = auditTrail.find((e: { step?: string }) => e.step?.toLowerCase().includes(key));
-              recordStep(
-                `${key}_agent_result`,
-                `${label} Complete`,
-                found
-                  ? `${label} agent returned a result from the orchestration pipeline.`
-                  : `${label} check completed as part of the onboarding pipeline.`,
-                cat,
-                'completed',
-                { icon }
+            // ── Record detailed agent decisions from backend metadata ──────────────────
+            // Check if we have legacy metadata with state machine history
+            const result = statusResponse.data.result || statusResponse.data;
+            const stateMachine = result?.stateMachine;
+            
+            if (stateMachine?.history) {
+              // Parse state machine history to extract agent results
+              const history = stateMachine.history;
+              const completedStates = history.filter((t: any) => 
+                t.state.includes('COMPLETED') && t.data?.agentOutput
               );
-            });
 
+              completedStates.forEach((transition: any) => {
+                const agentOutput = transition.data.agentOutput;
+                const slot = agentOutput.metadata?.slot || 'UNKNOWN';
+                const agentName = agentOutput.metadata?.agent_name || 'agent';
+                
+                // Map slot to category
+                const categoryMap: Record<string, 'kyc' | 'aml' | 'credit' | 'risk' | 'address'> = {
+                  'KYC': 'kyc',
+                  'AML': 'aml',
+                  'CREDIT': 'credit',
+                  'RISK': 'risk',
+                  'ADDRESS_VERIFICATION': 'address'
+                };
+                const category = categoryMap[slot] || 'kyc';
+                
+                // Map slot to label
+                const labelMap: Record<string, string> = {
+                  'KYC': 'KYC Verification',
+                  'AML': 'AML Screening',
+                  'CREDIT': 'Credit Assessment',
+                  'RISK': 'Risk Evaluation',
+                  'ADDRESS_VERIFICATION': 'Address Verification'
+                };
+                const label = labelMap[slot] || slot;
+                
+                // Map slot to icon
+                const iconMap: Record<string, string> = {
+                  'KYC': '🪪',
+                  'AML': '🔎',
+                  'CREDIT': '💳',
+                  'RISK': '⚖️',
+                  'ADDRESS_VERIFICATION': '📍'
+                };
+                const icon = iconMap[slot] || '📋';
+                
+                // Determine status based on proposal
+                const status = agentOutput.proposal === 'deny' ? 'failed' : 
+                              agentOutput.proposal === 'escalate' ? 'pending' : 'completed';
+                
+                // Create description with reasons
+                const description = agentOutput.reasons && agentOutput.reasons.length > 0
+                  ? agentOutput.reasons[0]
+                  : `${label} completed with ${agentOutput.proposal || 'success'}`;
+                
+                recordStep(
+                  `${slot.toLowerCase()}_agent_result`,
+                  `${label} Complete`,
+                  description,
+                  category,
+                  status,
+                  {
+                    icon,
+                    durationMs: transition.data?.durationMs,
+                    metadata: {
+                      agentName,
+                      proposal: agentOutput.proposal,
+                      confidence: agentOutput.confidence,
+                      reasons: agentOutput.reasons,
+                      policy_refs: agentOutput.policy_refs,
+                      flags: agentOutput.flags
+                    }
+                  }
+                );
+              });
+            } else {
+              // Fallback to generic agent steps if no state machine data
+              const auditTrail = statusResponse.data.auditTrail || [];
+              const agentChecks = [
+                { key: 'kyc', label: 'KYC Verification', cat: 'kyc' as const, icon: '🪪' },
+                { key: 'aml', label: 'AML Screening', cat: 'aml' as const, icon: '🔎' },
+                { key: 'credit', label: 'Credit Assessment', cat: 'credit' as const, icon: '💳' },
+                { key: 'risk', label: 'Risk Evaluation', cat: 'risk' as const, icon: '⚖️' },
+              ];
+              agentChecks.forEach(({ key, label, cat, icon }) => {
+                const found = auditTrail.find((e: { step?: string }) => e.step?.toLowerCase().includes(key));
+                recordStep(
+                  `${key}_agent_result`,
+                  `${label} Complete`,
+                  found
+                    ? `${label} agent returned a result from the orchestration pipeline.`
+                    : `${label} check completed as part of the onboarding pipeline.`,
+                  cat,
+                  'completed',
+                  { icon }
+                );
+              });
+            }
+
+            // Record final decision with risk tolerance context
             const decisionStatus = decision === 'APPROVE' ? 'approved' : decision === 'DENY' ? 'denied' : 'escalated';
+            const decisionDescription = decision === 'APPROVE'
+              ? `All verification checks passed. Application approved. (Risk Tolerance: ${riskToleranceLevel})`
+              : decision === 'DENY'
+                ? `One or more checks did not meet the required threshold. Application denied. (Risk Tolerance: ${riskToleranceLevel})`
+                : `Application flagged for manual review by compliance team. (Risk Tolerance: ${riskToleranceLevel})`;
+            
             recordStep(
               'final_decision',
               `Final Decision: ${decision}`,
-              decision === 'APPROVE'
-                ? 'All verification checks passed. Application approved.'
-                : decision === 'DENY'
-                  ? 'One or more checks did not meet the required threshold. Application denied.'
-                  : 'Application flagged for manual review by compliance team.',
+              decisionDescription,
               'decision',
               decision === 'APPROVE' ? 'completed' : decision === 'DENY' ? 'failed' : 'in_progress',
-              { icon: decision === 'APPROVE' ? '✅' : decision === 'DENY' ? '❌' : '⚠️', detail: decision, metadata: { traceId } }
+              { 
+                icon: decision === 'APPROVE' ? '✅' : decision === 'DENY' ? '❌' : '⚠️', 
+                detail: decision, 
+                metadata: { 
+                  traceId,
+                  riskTolerance: riskToleranceLevel,
+                  result: statusResponse.data.result
+                } 
+              }
             );
             finaliseAudit(decisionStatus as 'approved' | 'denied' | 'escalated', traceId, decision);
 

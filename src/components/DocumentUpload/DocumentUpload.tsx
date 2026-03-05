@@ -76,9 +76,9 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
   };
 
   return (
-    <div className="space-y-4 p-5 rounded-2xl bg-white/5 backdrop-blur-sm shadow-lg border border-white/10 transition-all">
+    <div className="space-y-4 p-5 rounded-2xl bg-white shadow-sm border border-slate-200 transition-all">
       <div>
-        <h3 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider px-1">
+        <h3 className="text-xs font-bold text-slate-600 mb-3 uppercase tracking-wider px-1">
           Upload KYC Document
         </h3>
         <p className="text-xs text-slate-500 px-1 mb-3">
@@ -91,8 +91,8 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
           htmlFor="file-upload"
           className={`relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-2xl text-sm font-medium transition-all cursor-pointer 
             ${selectedFile
-              ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-300'
-              : 'border-white/20 hover:border-indigo-400/50 hover:bg-indigo-500/10 text-slate-400'
+              ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
+              : 'border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/30 text-slate-600'
             }`}
           tabIndex={0}
           onKeyDown={(e) => {
@@ -114,12 +114,12 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
 
           {selectedFile ? (
             <div className="flex flex-col items-center space-y-2">
-              <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                <FileText className="h-5 w-5 text-emerald-400" />
+              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                <FileText className="h-5 w-5 text-emerald-600" />
               </div>
-              <span className="truncate max-w-[200px] font-semibold text-white">{selectedFile.name}</span>
+              <span className="truncate max-w-[200px] font-semibold text-slate-800">{selectedFile.name}</span>
               {detectedType && (
-                <span className="text-xs bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full font-semibold border border-indigo-500/30">
+                <span className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full font-semibold border border-indigo-200">
                   Detected: {getDocumentTypeName(detectedType)}
                 </span>
               )}
@@ -127,11 +127,11 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
             </div>
           ) : (
             <div className="text-center space-y-2">
-              <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mx-auto transition-colors group-hover:bg-indigo-500/20">
-                <Upload className="h-5 w-5 text-slate-400" />
+              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mx-auto transition-colors group-hover:bg-indigo-100">
+                <Upload className="h-5 w-5 text-slate-500" />
               </div>
               <div>
-                <p className="text-sm font-bold text-white">Upload Identity Document</p>
+                <p className="text-sm font-bold text-slate-700">Upload Identity Document</p>
                 <p className="text-[10px] opacity-60 uppercase tracking-tighter text-slate-500">PDF • JPG • PNG (up to 10MB)</p>
               </div>
             </div>
@@ -143,8 +143,8 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
         onClick={handleUpload}
         disabled={!selectedFile || disabled || isUploading}
         className={`w-full h-11 rounded-xl font-bold transition-all shadow-lg ${selectedFile
-            ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-500/25 active:scale-[0.98]'
-            : 'bg-slate-800 text-slate-500 border border-white/10'
+            ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200 active:scale-[0.98]'
+            : 'bg-slate-200 text-slate-400 border border-slate-300'
           }`}
       >
         {isUploading ? (

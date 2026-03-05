@@ -432,7 +432,7 @@ function ClientSideChat() {
       const documentTypeLabel = DOCUMENT_TYPES.find(t => t.value === documentType)?.label || documentType;
       setMessages(prev => [...prev, {
         id: `upload-${Date.now()}`,
-        content: `Uploading ${file.name}...`,
+        content: `📄 Document uploaded: ${documentTypeLabel}\n\nVerifying your ${documentTypeLabel.toLowerCase()}...`,
         role: 'assistant',
         type: 'text',
         timestamp: new Date().toISOString(),
@@ -632,37 +632,22 @@ function ClientSideChat() {
   };
 
   return (
-    <div className="chat-interface glass-container shadow-2xl relative overflow-y-auto flex flex-col bg-slate-950">
-      {/* Header */}
-      {/* <div className="p-4 bg-slate-950 text-white flex items-center"> */}
-        {/* <div className="flex flex-col">
-          <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-slate-500">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            System Active
-          </div>
-        </div> */}
-
-        {/* Settings Toggle */}
-        {/* <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className={`p-2 rounded-xl transition-all ${showSettings ? 'bg-indigo-600 text-white' : 'hover:bg-white/10 text-slate-400'}`}
-            title="Configure Agents"
-          >
-            <Settings2 size={20} />
-          </button>
-        </div>
-      </div> */}
+    <div className="chat-interface shadow-2xl relative overflow-y-auto flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Ambient background */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl" />
+      </div>
 
       {/* Agent Selection Panel */}
       {showSettings && availableAgents && (
-        <div className="bg-slate-900 border-b border-white/5 p-4 animate-in slide-in-from-top duration-300">
+        <div className="bg-slate-900/80 backdrop-blur-md border-b border-white/10 p-4 animate-in slide-in-from-top duration-300">
           <div className="flex items-center gap-2 mb-4">
             <Zap size={16} className="text-amber-400" />
             <h3 className="text-xs font-bold text-white uppercase tracking-widest">Agent Orchestration</h3>
             <button
               onClick={() => setShowSettings(false)}
-              className="ml-auto text-[10px] text-slate-500 hover:text-white font-bold"
+              className="ml-auto text-[10px] text-slate-400 hover:text-white font-bold"
             >
               CLOSE
             </button>
@@ -670,8 +655,8 @@ function ClientSideChat() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {Object.entries(availableAgents).map(([slot, slotConfig]: [string, any]) => (
-              <div key={slot} className="bg-white/5 rounded-xl p-3 border border-white/5">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2 flex items-center justify-between">
+              <div key={slot} className="bg-white/5 rounded-xl p-3 border border-white/10">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2 flex items-center justify-between">
                   {slot.replace('_', ' ')}
                   <span className="text-indigo-400">active</span>
                 </label>
@@ -698,13 +683,13 @@ function ClientSideChat() {
       )}
 
       {/* Messages Area */}
-      <div className="messages flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+      <div className="messages flex-1 overflow-y-auto p-4 space-y-4 bg-slate-900">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-4 opacity-70">
-            <div className="p-6 bg-white rounded-3xl shadow-sm">
-              <Bot size={48} className="text-indigo-500" />
+            <div className="p-6 bg-white/5 backdrop-blur-sm rounded-3xl shadow-lg border border-white/10">
+              <Bot size={48} className="text-indigo-400" />
             </div>
-            <p className="text-sm font-medium">Hello! I'm here to help with your onboarding.</p>
+            <p className="text-sm font-medium text-slate-300">Hello! I'm here to help with your onboarding.</p>
           </div>
         )}
 
@@ -717,9 +702,11 @@ function ClientSideChat() {
               {message.role === 'assistant' && (
                 <div className="flex-shrink-0 mt-1">
                   {message.type === 'error' ? (
-                    <AlertCircle size={16} className="text-rose-500" />
+                    <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center">
+                      <AlertCircle size={16} className="text-red-400" />
+                    </div>
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                    <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400">
                       <Bot size={14} />
                     </div>
                   )}
@@ -727,18 +714,24 @@ function ClientSideChat() {
               )}
 
               <div className="flex-1 min-w-0">
-                <div className="message-content text-sm leading-relaxed break-words whitespace-pre-wrap">
+                <div className={`message-content text-sm leading-relaxed break-words whitespace-pre-wrap rounded-2xl px-4 py-3 ${
+                  message.role === 'user' 
+                    ? 'bg-emerald-600 text-white ml-auto max-w-[85%]' 
+                    : message.type === 'error'
+                    ? 'bg-red-500/10 text-red-300 border border-red-500/30'
+                    : 'bg-white/5 text-slate-200 border border-white/10'
+                }`}>
                   {message.content}
                 </div>
 
-                <div className="message-time">
+                <div className={`message-time text-[10px] text-slate-500 mt-1 ${message.role === 'user' ? 'text-right' : ''}`}>
                   {formatTime(typeof message.timestamp === 'string' ? new Date(message.timestamp) : message.timestamp)}
                 </div>
               </div>
 
               {message.role === 'user' && (
                 <div className="flex-shrink-0 mt-1">
-                  <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-white">
+                  <div className="w-6 h-6 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600">
                     <User size={14} />
                   </div>
                 </div>
@@ -747,7 +740,7 @@ function ClientSideChat() {
 
             {message.suggestions && message.suggestions.length > 0 && (
               <div className="suggestions mt-3 pl-8">
-                <div className="suggestion-label flex items-center gap-1">
+                <div className="suggestion-label flex items-center gap-1 text-xs text-slate-400 mb-2">
                   <Info size={12} />
                   <span>Quick reply</span>
                 </div>
@@ -756,7 +749,7 @@ function ClientSideChat() {
                     <button
                       key={i}
                       type="button"
-                      className="suggestion hover:scale-105 active:scale-95 transition-transform"
+                      className="suggestion bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 hover:border-indigo-500/50 px-3 py-1.5 rounded-lg text-xs transition-all hover:scale-105 active:scale-95"
                       onClick={() => handleSuggestionClick(suggestion)}
                     >
                       {suggestion}
@@ -770,12 +763,10 @@ function ClientSideChat() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Audit Trail Link - Shown when completed */}
-      {/* Removed Audit Trail Link as per user request */}
       {/* Document Upload Section */}
       {showDocumentUpload && (
-        <div className="px-4 py-3 bg-white border-t border-indigo-50">
-          <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-indigo-600 uppercase tracking-wider">
+        <div className="px-4 py-3 bg-slate-900/80 backdrop-blur-md border-t border-white/10">
+          <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-indigo-400 uppercase tracking-wider">
             <CheckCircle2 size={14} />
             Step 2: Document Verification
           </div>
@@ -790,7 +781,7 @@ function ClientSideChat() {
 
       {/* Input Area - Hidden when completed */}
       {!showDocumentUpload && !isCompleted && (
-        <form onSubmit={handleSubmit} className="p-4 bg-white border-t border-indigo-50 flex items-center gap-2">
+        <form onSubmit={handleSubmit} className="p-4 bg-slate-900/80 backdrop-blur-md border-t border-white/10 flex items-center gap-2">
           <div className="relative flex-1 group">
             <input
               type="text"
@@ -798,18 +789,18 @@ function ClientSideChat() {
               onChange={(e) => setInputValue(e.target.value)}
               placeholder={currentField === 'address' ? 'e.g. 123 Main St, Bengaluru, Karnataka, India' : 'Type your message...'}
               disabled={isVerifying}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400"
+              className="w-full bg-slate-800/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all placeholder:text-slate-500"
             />
             {isVerifying && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
               </div>
             )}
           </div>
           <button
             type="submit"
             disabled={isVerifying || !inputValue.trim()}
-            className="flex items-center justify-center w-11 h-11 rounded-xl bg-indigo-600 text-white disabled:opacity-50 disabled:bg-slate-300 transition-all hover:bg-indigo-700 hover:shadow-lg active:scale-95 shadow-md shadow-indigo-100"
+            className="flex items-center justify-center w-11 h-11 rounded-xl bg-indigo-600 text-white disabled:opacity-50 disabled:bg-slate-700 transition-all hover:bg-indigo-500 hover:shadow-lg hover:shadow-indigo-500/25 active:scale-95 shadow-md"
             aria-label="Send message"
           >
             <Send size={18} />

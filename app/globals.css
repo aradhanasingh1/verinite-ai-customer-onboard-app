@@ -81,8 +81,7 @@ body {
 
 .message.user {
   margin-left: auto;
-  background: var(--user-bubble);
-  color: white;
+  /* background removed - using Tailwind classes in component */
   border-bottom-right-radius: 0.25rem;
 }
 

@@ -29,7 +29,9 @@ export const startOnboarding = async (documentId: string, documentType?: string,
       documentType,
       documents: context?.documents || [],
       applicant: context?.applicant || context || {},
-      extractedFields: context?.payload?.extractedFields || {} // Include extractedFields
+      extractedFields: context?.payload?.extractedFields || {}, // Include extractedFields
+      risk_tolerance: riskProfile, // Add risk tolerance inside payload for decision gateway
+      riskProfile: riskProfile // Also add as riskProfile for compatibility
     },
     timestamp: new Date().toISOString(),
   });

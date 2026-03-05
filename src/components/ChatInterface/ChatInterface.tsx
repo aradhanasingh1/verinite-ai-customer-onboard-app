@@ -69,6 +69,19 @@ function ClientSideChat() {
     messagesRef.current = messages;
   }, [messages]);
 
+  // Helper to add bot messages
+  const addBotMessage = (content: string, suggestions: string[] = []) => {
+    const message: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content,
+      timestamp: new Date().toISOString(),
+      type: 'bot',
+      suggestions
+    };
+    setMessages(prev => [...prev, message]);
+  };
+
   const [showSettings, setShowSettings] = useState(false);
   const [availableAgents, setAvailableAgents] = useState<any>(null);
   const [agentSelection, setAgentSelection] = useState<Record<string, string>>({});
@@ -204,19 +217,6 @@ function ClientSideChat() {
     } finally {
       setIsVerifying(false);
     }
-  };
-
-  // Helper to add bot messages
-  const addBotMessage = (content: string, suggestions: string[] = []) => {
-    const message: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'assistant',
-      content,
-      timestamp: new Date().toISOString(), // Ensure consistent string format
-      type: 'bot',
-      suggestions
-    };
-    setMessages(prev => [...prev, message]);
   };
 
   // Helper function to validate input based on field type

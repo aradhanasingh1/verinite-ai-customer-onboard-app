@@ -195,7 +195,7 @@ body {
 .upload-overlay {
   background: #f8fafc;
   border-radius: 1rem;
-  margin-top: 1rem;
+  /* margin-top: 1rem; */
   border: 2px dashed #e2e8f0;
   transition: all 0.2s ease;
 }

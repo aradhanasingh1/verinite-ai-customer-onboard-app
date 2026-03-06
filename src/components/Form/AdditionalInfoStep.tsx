@@ -50,8 +50,8 @@ const AdditionalInfoStep: React.FC<FormStepProps> = ({ formData, handleChange, e
       if (setFormData) {
         setFormData({
           ...formData,
-          idType: type,
-          uploadedDocument: file.name
+          idType: type
+          // uploadedDocument: file.name
         });
       }
     }

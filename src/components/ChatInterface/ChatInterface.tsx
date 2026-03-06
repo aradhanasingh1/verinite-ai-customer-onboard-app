@@ -467,6 +467,9 @@ function ClientSideChat() {
         }
       };
 
+      // Format document type for display
+      const documentTypeLabel = documentType.charAt(0).toUpperCase() + documentType.slice(1).replace(/_/g, ' ');
+
       setMessages(prev => [...prev, {
         id: `upload-${Date.now()}`,
         content: `📄 Document uploaded: ${documentTypeLabel}\n\nVerifying your ${documentTypeLabel.toLowerCase()}...`,
@@ -829,7 +832,7 @@ function ClientSideChat() {
             <CheckCircle2 size={14} />
             Step 2: Document Verification
           </div>
-          <div className="upload-overlay p-1">
+          <div className="upload-overlay">
             <DocumentUpload
               onUpload={handleDocumentUpload}
               disabled={isVerifying}

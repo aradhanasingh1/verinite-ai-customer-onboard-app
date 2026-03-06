@@ -76,7 +76,7 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
   };
 
   return (
-    <div className="space-y-4 p-5 rounded-2xl bg-white shadow-sm border border-slate-200 transition-all">
+    <div className="space-y-2 p-1 rounded-2xl bg-white shadow-sm border border-slate-200 transition-all">
       <div>
         <h3 className="text-xs font-bold text-slate-600 mb-3 uppercase tracking-wider px-1">
           Upload KYC Document
@@ -113,22 +113,22 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
           />
 
           {selectedFile ? (
-            <div className="flex flex-col items-center space-y-2">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                <FileText className="h-5 w-5 text-emerald-600" />
+            <div className="flex flex-col items-center">
+              <div className="w-10 h-1 rounded-full bg-emerald-100 flex items-center justify-center">
+                <FileText className="h-1 w-5 text-emerald-600" />
               </div>
               <span className="truncate max-w-[200px] font-semibold text-slate-800">{selectedFile.name}</span>
               {detectedType && (
-                <span className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full font-semibold border border-indigo-200">
+                <span className="text-xs bg-indigo-100 text-indigo-700 px-3 rounded-full font-semibold border border-indigo-200">
                   Detected: {getDocumentTypeName(detectedType)}
                 </span>
               )}
               <span className="text-[10px] opacity-70 text-slate-500">Click to change file</span>
             </div>
           ) : (
-            <div className="text-center space-y-2">
-              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mx-auto transition-colors group-hover:bg-indigo-100">
-                <Upload className="h-5 w-5 text-slate-500" />
+            <div className="text-center">
+              <div className="w-10 h-1 rounded-full bg-slate-100 flex items-center justify-center mx-auto transition-colors group-hover:bg-indigo-100">
+                <Upload className="h-1 w-5 text-slate-500" />
               </div>
               <div>
                 <p className="text-sm font-bold text-slate-700">Upload Identity Document</p>
@@ -142,7 +142,7 @@ export function DocumentUpload({ onUpload, disabled }: DocumentUploadProps) {
       <Button
         onClick={handleUpload}
         disabled={!selectedFile || disabled || isUploading}
-        className={`w-full h-11 rounded-xl font-bold transition-all shadow-lg ${selectedFile
+        className={`w-full h-8 rounded-xl font-bold transition-all shadow-lg ${selectedFile
             ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200 active:scale-[0.98]'
             : 'bg-slate-200 text-slate-400 border border-slate-300'
           }`}

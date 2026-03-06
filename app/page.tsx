@@ -194,7 +194,7 @@ export default function CustomerOnboardingPage() {
           )}
 
           {/* ── Audit trail banner ── */}
-          <div className="flex items-center justify-between rounded-xl border border-indigo-500/20 bg-gradient-to-r from-indigo-900/20 via-violet-900/20 to-purple-900/20 p-4 shadow-lg gap-4 flex-wrap backdrop-blur-sm">
+          <div className="flex items-center justify-between rounded-xl z-0 border border-indigo-500/20 bg-gradient-to-r from-indigo-900/20 via-violet-900/20 to-purple-900/20 p-4 shadow-lg gap-4 flex-wrap backdrop-blur-sm">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-base shadow-md shadow-indigo-500/20">
                 🔍

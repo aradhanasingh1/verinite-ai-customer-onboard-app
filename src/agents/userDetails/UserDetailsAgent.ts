@@ -51,8 +51,13 @@ export class UserDetailsAgent {
     }
   };
 
-  constructor(onMessage: (message: ChatMessage) => void) {
+  constructor(onMessage: (message: ChatMessage) => void, prefilledData?: Record<string, any>) {
     this.onMessage = onMessage;
+    // Pre-fill data from document extraction if available
+    if (prefilledData) {
+      this.collectedData = { ...prefilledData };
+      console.log('[UserDetailsAgent] Pre-filled data from document:', this.collectedData);
+    }
   }
 
   public initialize() {
@@ -107,6 +112,16 @@ export class UserDetailsAgent {
   }
 
   private askForNextField() {
+    // Skip fields that are already collected
+    while (this.currentFieldIndex < agentConfig.userDetails.requiredFields.length) {
+      const field = this.getCurrentField();
+      if (!field || !this.collectedData[field]) {
+        break;
+      }
+      console.log(`[UserDetailsAgent] Skipping ${field} - already collected:`, this.collectedData[field]);
+      this.currentFieldIndex++;
+    }
+
     const field = this.getCurrentField();
     if (!field) {
       this.onComplete();
@@ -192,5 +207,11 @@ export class UserDetailsAgent {
 
   getCollectedData() {
     return { ...this.collectedData };
+  }
+
+  // Method to update collected data from document extraction
+  public updateCollectedData(data: Record<string, any>) {
+    this.collectedData = { ...this.collectedData, ...data };
+    console.log('[UserDetailsAgent] Updated collected data:', this.collectedData);
   }
 }

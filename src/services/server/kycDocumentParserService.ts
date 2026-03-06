@@ -271,6 +271,114 @@ const toVerificationFields = (
   return output;
 };
 
+/**
+ * Process passport-specific fields and normalize them
+ * - Maps "Given Name" + "Surname" to full name
+ * - Converts date format from MM/DD/YYYY to YYYY-MM-DD
+ * - Normalizes field names
+ */
+const processPassportFields = (fields: KycExtractedField[]): KycExtractedField[] => {
+  const processedFields: KycExtractedField[] = [];
+  let givenName: string | null = null;
+  let surname: string | null = null;
+  
+  for (const field of fields) {
+    const keyLower = field.key.toLowerCase().replace(/[\s-_]/g, '');
+    const value = field.value;
+    
+    // Capture given name and surname separately
+    if (keyLower === 'givenname' || keyLower === 'givennames' || keyLower === 'firstname') {
+      givenName = value;
+      processedFields.push({ key: 'givenName', value, confidence: field.confidence });
+      continue;
+    }
+    
+    if (keyLower === 'surname' || keyLower === 'lastname' || keyLower === 'familyname') {
+      surname = value;
+      processedFields.push({ key: 'surname', value, confidence: field.confidence });
+      continue;
+    }
+    
+    // Convert date fields from MM/DD/YYYY to YYYY-MM-DD
+    if (keyLower.includes('date') || keyLower === 'dob' || keyLower === 'dateofbirth') {
+      const convertedDate = convertDateFormat(value);
+      if (convertedDate) {
+        // Store both original and converted formats
+        processedFields.push({ 
+          key: field.key, 
+          value: convertedDate, 
+          confidence: field.confidence 
+        });
+        
+        // If it's DOB, also add as dateOfBirth
+        if (keyLower === 'dob' || keyLower === 'dateofbirth') {
+          processedFields.push({ 
+            key: 'dateOfBirth', 
+            value: convertedDate, 
+            confidence: field.confidence 
+          });
+        }
+        continue;
+      }
+    }
+    
+    // Keep other fields as-is
+    processedFields.push(field);
+  }
+  
+  // Combine given name and surname into full name if both exist
+  if (givenName && surname) {
+    const fullName = `${givenName} ${surname}`;
+    processedFields.unshift({ 
+      key: 'fullName', 
+      value: fullName, 
+      confidence: null 
+    });
+  }
+  
+  return processedFields;
+};
+
+/**
+ * Convert date from MM/DD/YYYY to YYYY-MM-DD format
+ */
+const convertDateFormat = (dateStr: string): string | null => {
+  if (!dateStr) return null;
+  
+  // Try to match MM/DD/YYYY format
+  const mmddyyyyMatch = dateStr.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (mmddyyyyMatch) {
+    const [, month, day, year] = mmddyyyyMatch;
+    const mm = month.padStart(2, '0');
+    const dd = day.padStart(2, '0');
+    return `${year}-${mm}-${dd}`;
+  }
+  
+  // Try to match DD/MM/YYYY format (common in some countries)
+  const ddmmyyyyMatch = dateStr.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (ddmmyyyyMatch) {
+    const [, day, month, year] = ddmmyyyyMatch;
+    // Heuristic: if day > 12, it's definitely DD/MM/YYYY
+    const dayNum = parseInt(day, 10);
+    const monthNum = parseInt(month, 10);
+    
+    if (dayNum > 12) {
+      // Definitely DD/MM/YYYY
+      const mm = month.padStart(2, '0');
+      const dd = day.padStart(2, '0');
+      return `${year}-${mm}-${dd}`;
+    }
+  }
+  
+  // Already in YYYY-MM-DD format
+  if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return dateStr;
+  }
+  
+  // Return original if we can't parse it
+  return dateStr;
+};
+
 export const parseDocumentForKyc = async (
   file: File,
   requestedTypeInput: string
@@ -368,6 +476,19 @@ export const parseDocumentForKyc = async (
 
   let extraction: ExtractionPayload | null = null;
   try {
+    // Build document-specific instructions for the AI
+    let documentSpecificInstructions = '';
+    if (ocrTypeHint === 'passport' || requestedType === 'passport') {
+      documentSpecificInstructions = `
+IMPORTANT PASSPORT-SPECIFIC INSTRUCTIONS:
+- The field "Given Name" or "Given Names" should be extracted as the person's first/given name
+- The field "Surname" should be extracted as the person's last name
+- Combine "Given Name" and "Surname" to create the full name
+- Date of Birth format in passports is typically MM/DD/YYYY - extract it exactly as shown
+- Look for fields like: Passport No., Date of Birth, Date of Issue, Date of Expiry, Place of Birth, Nationality
+- Extract all these fields into the fields array with their exact values`;
+    }
+
     const extractionResponse = await callGroq(groqApiKey, {
       model: extractionModel,
       temperature: 0,
@@ -383,7 +504,8 @@ export const parseDocumentForKyc = async (
         {
           role: 'system',
           content:
-            'Extract KYC-ready structured data from OCR text. Prefer exact values from OCR. Use null when unavailable.',
+            'Extract KYC-ready structured data from OCR text. Prefer exact values from OCR. Use null when unavailable.' +
+            (documentSpecificInstructions ? '\n\n' + documentSpecificInstructions : ''),
         },
         {
           role: 'user',
@@ -430,11 +552,23 @@ export const parseDocumentForKyc = async (
         .filter((field): field is KycExtractedField => Boolean(field))
     : [];
 
-  if (name && !fields.find((field) => field.key === 'fullName')) {
-    fields.unshift({ key: 'fullName', value: name, confidence: null });
+  // Apply passport-specific field processing
+  let processedFields = fields;
+  if (normalizedType === 'passport') {
+    processedFields = processPassportFields(fields);
+    
+    // Update name from processed fields if available
+    const fullNameField = processedFields.find(f => f.key === 'fullName');
+    if (fullNameField && !name) {
+      extraction.name = fullNameField.value;
+    }
   }
-  if (idNumber && !fields.find((field) => field.key === 'idNumber')) {
-    fields.unshift({ key: 'idNumber', value: idNumber, confidence: null });
+
+  if (name && !processedFields.find((field) => field.key === 'fullName')) {
+    processedFields.unshift({ key: 'fullName', value: name, confidence: null });
+  }
+  if (idNumber && !processedFields.find((field) => field.key === 'idNumber')) {
+    processedFields.unshift({ key: 'idNumber', value: idNumber, confidence: null });
   }
 
   const normalizedExtraction: ExtractionPayload = {
@@ -443,9 +577,9 @@ export const parseDocumentForKyc = async (
       typeof extraction.documentTypeConfidence === 'number'
         ? extraction.documentTypeConfidence
         : null,
-    name,
+    name: extraction.name || name,
     idNumber,
-    fields,
+    fields: processedFields,
   };
 
   return {
@@ -457,7 +591,7 @@ export const parseDocumentForKyc = async (
       documentType: normalizedType,
       idNumber: normalizedExtraction.idNumber || null,
       rawText,
-      fields,
+      fields: processedFields,
     },
     verificationFields: toVerificationFields(normalizedType, normalizedExtraction),
     modelInfo: {

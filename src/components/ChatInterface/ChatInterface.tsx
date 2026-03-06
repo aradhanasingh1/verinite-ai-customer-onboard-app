@@ -62,6 +62,7 @@ function ClientSideChat() {
   const [isCompleted, setIsCompleted] = useState(false);
   const [currentTraceId, setCurrentTraceId] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [extractedDocumentData, setExtractedDocumentData] = useState<any>(null);
   const messagesRef = useRef<ChatMessage[]>(messages);
 
   // Sync messagesRef with messages state
@@ -369,6 +370,13 @@ function ClientSideChat() {
     document.querySelector('form')?.dispatchEvent(submitEvent);
   };
 
+  // Helper function to extract field value from fields array
+  const getFieldValue = (fields: any[], key: string): string | null => {
+    if (!fields || !Array.isArray(fields)) return null;
+    const field = fields.find(f => f.key?.toLowerCase() === key.toLowerCase());
+    return field?.value || null;
+  };
+
   const handleDocumentUpload = async (file: File, documentType: string) => {
     try {
       // Validate file before upload
@@ -393,11 +401,33 @@ function ClientSideChat() {
         ? (parsedDocument.verificationFields || {})
         : {};
 
+      // Extract DOB and address from fields array (declare outside if block for wider scope)
+      let dob: string | null = null;
+      let address: string | null = null;
+
+      // Store extracted data in state for later use
+      if (parsedExtractedData) {
+        setExtractedDocumentData(parsedExtractedData);
+        
+        // Extract DOB and address
+        dob = parsedExtractedData.dateOfBirth || 
+              parsedExtractedData.dob || 
+              getFieldValue(parsedExtractedData.fields, 'dateOfBirth') ||
+              getFieldValue(parsedExtractedData.fields, 'dob') ||
+              getFieldValue(parsedExtractedData.fields, 'date_of_birth');
+        
+        address = parsedExtractedData.address || 
+                 getFieldValue(parsedExtractedData.fields, 'address');
+      }
+
       if (parsedDocument.success && parsedExtractedData) {
+
         const parsedLines = [
           parsedExtractedData.documentType ? `Type: ${parsedExtractedData.documentType}` : null,
           parsedExtractedData.name ? `Name: ${parsedExtractedData.name}` : null,
           parsedExtractedData.idNumber ? `ID Number: ${parsedExtractedData.idNumber}` : null,
+          dob ? `Date of Birth: ${dob}` : null,
+          address ? `Address: ${address}` : null,
         ].filter(Boolean);
 
         setMessages(prev => [...prev, {
@@ -410,6 +440,37 @@ function ClientSideChat() {
           suggestions: [],
           timestamp: new Date().toISOString(),
         }]);
+
+        // Record OCR extraction in audit trail
+        const extractedFields = {
+          ...(parsedExtractedData.documentType ? { documentType: parsedExtractedData.documentType } : {}),
+          ...(parsedExtractedData.name ? { name: parsedExtractedData.name } : {}),
+          ...(parsedExtractedData.idNumber ? { idNumber: parsedExtractedData.idNumber } : {}),
+          ...(dob ? { dateOfBirth: dob } : {}),
+          ...(address ? { address: address } : {}),
+        };
+
+        const extractedFieldsList = Object.entries(extractedFields)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(', ');
+
+        recordStep(
+          'ocr_extraction',
+          'Document Data Extracted',
+          `OCR successfully extracted ${Object.keys(extractedFields).length} field(s) from the uploaded document.`,
+          'documents',
+          'completed',
+          {
+            icon: '🔍',
+            detail: extractedFieldsList,
+            metadata: {
+              extractedFields,
+              documentType: parsedExtractedData.documentType,
+              confidence: parsedDocument.confidence || 'N/A',
+              extractionMethod: 'OCR + AI'
+            }
+          }
+        );
       } else {
         setMessages(prev => [...prev, {
           id: `ocr-warning-${Date.now()}`,
@@ -419,6 +480,23 @@ function ClientSideChat() {
           suggestions: [],
           timestamp: new Date().toISOString(),
         }]);
+
+        // Record failed OCR extraction in audit trail
+        recordStep(
+          'ocr_extraction_failed',
+          'Document Extraction Failed',
+          `OCR could not extract structured data from the document: ${parsedDocument.error || 'Unknown error'}`,
+          'documents',
+          'failed',
+          {
+            icon: '⚠️',
+            detail: parsedDocument.error || 'No structured data extracted',
+            metadata: {
+              error: parsedDocument.error,
+              extractionMethod: 'OCR + AI'
+            }
+          }
+        );
       }
 
       // Sync enriched slots before upload so backend orchestration can use OCR output.
@@ -428,8 +506,13 @@ function ClientSideChat() {
           ...(parsedExtractedData?.name ? { fullName: parsedExtractedData.name } : {}),
           ...(parsedExtractedData?.idNumber ? { idNumber: parsedExtractedData.idNumber } : {}),
           ...(parsedExtractedData?.documentType ? { idType: parsedExtractedData.documentType } : {}),
+          ...(dob ? { dateOfBirth: dob } : {}),
+          ...(address ? { address: address } : {}),
         };
         console.log('[ChatInterface] Syncing collected+OCR data to backend:', enrichedSlots);
+
+        // Update agent's collected data with extracted information
+        agent.updateCollectedData(enrichedSlots);
 
         try {
           const syncResponse = await fetch(`${API_BASE_URL}/chat/session/${currentSessionId}/sync-slots`, {
@@ -617,6 +700,35 @@ function ClientSideChat() {
                 suggestions: [],
                 timestamp: new Date().toISOString(),
               }]);
+
+              // Show captured user details from document AFTER final decision
+              const capturedFields: string[] = [];
+              if (extractedDocumentData?.name) capturedFields.push(`Name: ${extractedDocumentData.name}`);
+              if (extractedDocumentData?.idNumber) capturedFields.push(`ID Number: ${extractedDocumentData.idNumber}`);
+              
+              // Extract DOB from fields array
+              const capturedDob = extractedDocumentData?.dateOfBirth || 
+                                 extractedDocumentData?.dob || 
+                                 getFieldValue(extractedDocumentData?.fields || [], 'dateOfBirth') ||
+                                 getFieldValue(extractedDocumentData?.fields || [], 'dob') ||
+                                 getFieldValue(extractedDocumentData?.fields || [], 'date_of_birth');
+              if (capturedDob) capturedFields.push(`Date of Birth: ${capturedDob}`);
+              
+              // Extract address from fields array
+              const capturedAddress = extractedDocumentData?.address || 
+                                     getFieldValue(extractedDocumentData?.fields || [], 'address');
+              if (capturedAddress) capturedFields.push(`Address: ${capturedAddress}`);
+              
+              if (capturedFields.length > 0) {
+                setMessages(prev => [...prev, {
+                  id: `verified-details-${Date.now()}`,
+                  content: `📋 Verified Details from Your Document:\n\n${capturedFields.join('\n')}\n\nThese details have been verified and recorded in your application.`,
+                  role: 'assistant',
+                  type: 'text',
+                  timestamp: new Date().toISOString(),
+                  suggestions: []
+                }]);
+              }
 
               // Mark as completed to show Audit Trail link
               setIsCompleted(true);

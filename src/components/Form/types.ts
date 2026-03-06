@@ -46,6 +46,7 @@ export interface FormStepProps {
   setErrors?: (errors: Record<string, string>) => void;
   onNext?: () => void;
   onPrevious?: () => void;
+  onExtractedDataChange?: (data: any) => void;
 }
 
 export type Proposal = 'approve' | 'deny' | 'escalate';

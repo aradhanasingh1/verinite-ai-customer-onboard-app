@@ -8,10 +8,14 @@ export interface KYCDocumentResult {
   success: boolean;
   documentType?: string;
   documentTypeConfidence?: number | null;
+  confidence?: number | null;
   extractedData?: {
     name: string | null;
     documentType: string;
     idNumber: string | null;
+    dateOfBirth?: string | null;
+    dob: string | null;
+    address: string | null;
     rawText: string;
     fields: KYCExtractedField[];
   };

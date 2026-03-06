@@ -7,6 +7,7 @@ import AdditionalInfoStep from './AdditionalInfoStep';
 import SuccessStep from './SuccessStep';
 import { verifyAddress } from '../../utils/api';
 import { FormData, VerifiedAddress } from './types';
+import { startOnboarding } from '../../services/documentService';
 import {
   getOrCreateSession,
   recordStep,
@@ -26,6 +27,14 @@ const MultiStepForm: React.FC = () => {
   const [isAddressValid, setIsAddressValid] = useState(false);
   const [finalDecision, setFinalDecision] = useState<string | null>(null);
   const [traceId, setTraceId] = useState<string | null>(null);
+  const [extractedDocumentData, setExtractedDocumentData] = useState<any>(null);
+
+  // Helper function to extract field value from fields array
+  const getFieldValue = (fields: any[], key: string): string | null => {
+    if (!fields || !Array.isArray(fields)) return null;
+    const field = fields.find((f: any) => f.key?.toLowerCase() === key.toLowerCase());
+    return field?.value || null;
+  };
 
   // ── Initialise audit session on mount ──────────────────────────────────
   useEffect(() => {
@@ -84,6 +93,23 @@ const MultiStepForm: React.FC = () => {
       if (!formData.state?.trim()) newErrors.state = 'State/Province is required';
       if (!formData.postalCode?.trim()) newErrors.postalCode = 'ZIP/Postal code is required';
       if (!formData.country) newErrors.country = 'Country is required';
+    }
+
+    if (step === 3) {
+      if (!formData.idNumber?.trim()) {
+        newErrors.idNumber = 'Document ID number is required. Please upload a document or enter it manually.';
+      } else {
+        // Validate based on document type
+        const idNumber = formData.idNumber.replace(/\s/g, ''); // Remove spaces
+        if (formData.idType === 'aadhaar' && !/^\d{12}$/.test(idNumber)) {
+          newErrors.idNumber = 'Aadhaar number must be exactly 12 digits';
+        } else if (formData.idType === 'pan_card' && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(idNumber.toUpperCase())) {
+          newErrors.idNumber = 'PAN number must be in format ABCDE1234F';
+        } else if (formData.idType === 'passport' && idNumber.length < 6) {
+          newErrors.idNumber = 'Passport number must be at least 6 characters';
+        }
+      }
+      if (!formData.termsAccepted) newErrors.termsAccepted = 'You must accept the terms and conditions';
     }
 
     setErrors(newErrors);
@@ -260,6 +286,11 @@ const MultiStepForm: React.FC = () => {
       return;
     }
 
+    // Validate step 3 before submission
+    if (!validateStep(3)) {
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -276,22 +307,14 @@ const MultiStepForm: React.FC = () => {
         },
         documents: [
           {
-            type: 'aadhaar',
-            number: formData.idNumber,
-            name: formData.fullName,
-            dob: formData.dateOfBirth,
-            gender: formData.gender.toLowerCase(),
-            looks_authentic: true
-          },
-          {
             type: formData.idType,
             number: formData.idNumber,
             name: formData.fullName,
             dob: formData.dateOfBirth,
             gender: formData.gender.toLowerCase(),
+            looks_authentic: true,
             ...(formData.idType === 'passport' ? {
-              country: formData.country,
-              looks_authentic: true
+              country: formData.country
             } : {})
           }
         ],
@@ -303,15 +326,34 @@ const MultiStepForm: React.FC = () => {
 
       console.log('Submitting form with payload:', formattedPayload);
 
-     // Get risk tolerance from localStorage
-      let riskTolerance = 'HIGH'; // Default to HIGH for auto-approval
-      if (typeof window !== 'undefined') {
-        const stored = localStorage.getItem('verinite_default_risk_tolerance');
-        if (stored === 'HIGH' || stored === 'LOW') {
-          riskTolerance = stored;
+      // Get the current risk tolerance from the audit store
+      const session = getCurrentSession();
+      let riskToleranceValue = 'high'; // Default to high for auto-approval
+      let riskToleranceLevel: RiskToleranceLevel = 'HIGH';
+      if (session?.sessionId) {
+        try {
+          const riskTolerance = await getRiskToleranceAsync(session.sessionId);
+          if (riskTolerance) {
+            riskToleranceValue = riskTolerance.toLowerCase();
+            riskToleranceLevel = riskTolerance;
+            console.log(`[Form] Using risk tolerance from audit store: ${riskToleranceValue}`);
+          }
+        } catch (error) {
+          console.warn('[Form] Failed to get risk tolerance from audit store, checking localStorage:', error);
         }
       }
-      console.log('Using risk tolerance:', riskTolerance);
+      
+      // Fallback to localStorage (set from landing page)
+      if (riskToleranceLevel === 'HIGH' && typeof window !== 'undefined') {
+        const stored = localStorage.getItem('verinite_default_risk_tolerance');
+        if (stored === 'HIGH' || stored === 'LOW') {
+          riskToleranceLevel = stored;
+          riskToleranceValue = stored.toLowerCase();
+          console.log(`[Form] Using risk tolerance from localStorage: ${riskToleranceValue}`);
+        }
+      }
+      
+      console.log('[Form] Final risk tolerance:', riskToleranceValue);
       
       recordStep(
         'additional_info_complete',
@@ -331,60 +373,48 @@ const MultiStepForm: React.FC = () => {
         { icon: '⚙️' }
       );
 
-      // Get the current risk tolerance from the audit store
-      const session = getCurrentSession();
-      let riskToleranceValue = 'high'; // Default to high for auto-approval
-      let riskToleranceLevel: RiskToleranceLevel = 'HIGH';
-      if (session?.sessionId) {
-        try {
-          const riskTolerance = await getRiskToleranceAsync(session.sessionId);
-          if (riskTolerance) {
-            riskToleranceValue = riskTolerance.toLowerCase();
-            riskToleranceLevel = riskTolerance;
-            console.log(`[Form] Using risk tolerance: ${riskToleranceValue}`);
-            
-            // Record audit step showing risk tolerance is being applied
-            const riskDescription = riskToleranceLevel === 'HIGH'
-              ? 'Applying HIGH risk tolerance: Will auto-approve if all checks pass.'
-              : 'Applying LOW risk tolerance: Will escalate for manual review.';
-            
-            recordStep(
-              'risk_tolerance_applied',
-              `Risk Tolerance Applied: ${riskToleranceLevel}`,
-              riskDescription,
-              'risk',
-              'completed',
-              {
-                icon: riskToleranceLevel === 'HIGH' ? '🚀' : '🛡️',
-                detail: riskToleranceLevel === 'HIGH' 
-                  ? 'Decision Rule: HIGH + All Checks Pass → APPROVE' 
-                  : 'Decision Rule: LOW → ESCALATE (Manual Review)',
-                metadata: {
-                  level: riskToleranceLevel,
-                  appliedAt: new Date().toISOString(),
-                  expectedBehavior: riskToleranceLevel === 'HIGH'
-                    ? 'Auto-approve on success'
-                    : 'Manual review required'
-                }
-              }
-            );
+      // Record audit step showing risk tolerance is being applied
+      const riskDescription = riskToleranceLevel === 'HIGH'
+        ? 'Applying HIGH risk tolerance: Will auto-approve if all checks pass.'
+        : 'Applying LOW risk tolerance: Will escalate for manual review.';
+      
+      recordStep(
+        'risk_tolerance_applied',
+        `Risk Tolerance Applied: ${riskToleranceLevel}`,
+        riskDescription,
+        'risk',
+        'completed',
+        {
+          icon: riskToleranceLevel === 'HIGH' ? '🚀' : '🛡️',
+          detail: riskToleranceLevel === 'HIGH' 
+            ? 'Decision Rule: HIGH + All Checks Pass → APPROVE' 
+            : 'Decision Rule: LOW → ESCALATE (Manual Review)',
+          metadata: {
+            level: riskToleranceLevel,
+            appliedAt: new Date().toISOString(),
+            expectedBehavior: riskToleranceLevel === 'HIGH'
+              ? 'Auto-approve on success'
+              : 'Manual review required'
           }
-        } catch (error) {
-          console.warn('[Form] Failed to get risk tolerance, using default (high):', error);
         }
-      }
+      );
 
-      const response = await axios.post('http://localhost:4000/onboarding/start', {
-        customerId: `cust-${Date.now()}`,
-        applicationId: `app-${Date.now()}`,
-        payload: {
-          ...formattedPayload,
-          risk_tolerance: riskToleranceValue, // Add risk tolerance inside payload
-          riskProfile: riskToleranceValue // Also add as riskProfile for compatibility
-        }
-      });
+      const response = await startOnboarding(
+        'form-submission', // documentId (form doesn't have actual document upload)
+        formData.idType, // documentType
+        {
+          customerId: `cust-${Date.now()}`,
+          applicationId: `app-${Date.now()}`,
+          applicant: formattedPayload.applicant,
+          documents: formattedPayload.documents,
+          signals: formattedPayload.signals
+        }, // context
+        {}, // agentSelection (empty for form flow)
+        riskToleranceValue, // riskProfile
+        session?.sessionId // sessionId
+      );
 
-      const newTraceId = response.data.traceId;
+      const newTraceId = response.traceId;
       setTraceId(newTraceId);
       console.log('Onboarding started with trace ID:', newTraceId);
       const traceId = newTraceId;
@@ -533,6 +563,48 @@ const MultiStepForm: React.FC = () => {
                 } 
               }
             );
+
+            // Show verified details from document AFTER final decision
+            if (extractedDocumentData) {
+              const capturedDob = extractedDocumentData.dateOfBirth || 
+                                 extractedDocumentData.dob || 
+                                 getFieldValue(extractedDocumentData.fields || [], 'dateOfBirth') ||
+                                 getFieldValue(extractedDocumentData.fields || [], 'dob') ||
+                                 getFieldValue(extractedDocumentData.fields || [], 'date_of_birth');
+              
+              const capturedAddress = extractedDocumentData.address || 
+                                     getFieldValue(extractedDocumentData.fields || [], 'address');
+
+              const verifiedFields: Record<string, string> = {};
+              if (extractedDocumentData.name) verifiedFields.name = extractedDocumentData.name;
+              if (extractedDocumentData.idNumber) verifiedFields.idNumber = extractedDocumentData.idNumber;
+              if (capturedDob) verifiedFields.dateOfBirth = capturedDob;
+              if (capturedAddress) verifiedFields.address = capturedAddress;
+
+              if (Object.keys(verifiedFields).length > 0) {
+                const verifiedFieldsList = Object.entries(verifiedFields)
+                  .map(([key, value]) => `${key}: ${value}`)
+                  .join(', ');
+
+                recordStep(
+                  'verified_details_display',
+                  'Verified Document Details',
+                  `Details captured and verified from uploaded document: ${verifiedFieldsList}`,
+                  'documents',
+                  'completed',
+                  {
+                    icon: '📋',
+                    detail: verifiedFieldsList,
+                    metadata: {
+                      verifiedFields,
+                      documentType: extractedDocumentData.documentType,
+                      displayedAfterDecision: true
+                    }
+                  }
+                );
+              }
+            }
+
             finaliseAudit(decisionStatus as 'approved' | 'denied' | 'escalated', traceId, decision);
 
             console.log('Onboarding completed successfully with decision:', decision);
@@ -634,6 +706,7 @@ const MultiStepForm: React.FC = () => {
             handleChange={handleChange}
             errors={errors}
             setFormData={setFormData}
+            onExtractedDataChange={setExtractedDocumentData}
           />
         );
       default:

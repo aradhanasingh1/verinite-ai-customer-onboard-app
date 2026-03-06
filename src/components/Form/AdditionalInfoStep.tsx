@@ -32,27 +32,199 @@ function getDocumentTypeName(type: string): string {
   return names[type] || 'Identity Document';
 }
 
-const AdditionalInfoStep: React.FC<FormStepProps> = ({ formData, handleChange, errors, setFormData }) => {
+const AdditionalInfoStep: React.FC<FormStepProps> = ({ formData, handleChange, errors, setFormData, onExtractedDataChange }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [detectedType, setDetectedType] = useState<string>('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationError, setVerificationError] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
+      setVerificationError('');
       
-      // Auto-detect document type from filename
-      const type = detectDocumentType(file.name);
-      setDetectedType(type);
+      // First, try filename-based detection as a fallback
+      const filenameType = detectDocumentType(file.name);
+      console.log('[AdditionalInfoStep] Filename-based detection:', filenameType);
       
-      // Update form data with detected type
+      // Set initial type from filename
+      setDetectedType(filenameType);
       if (setFormData) {
         setFormData({
           ...formData,
-          idType: type
-          // uploadedDocument: file.name
+          idType: filenameType
         });
+      }
+      
+      // Record document upload start in audit trail
+      const { recordStep } = await import('@/lib/auditStore');
+      recordStep(
+        'doc_upload_form_start',
+        'Document Upload Started',
+        `User uploaded document: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`,
+        'documents',
+        'in_progress',
+        {
+          icon: '📤',
+          detail: `File: ${file.name}`,
+          metadata: {
+            fileName: file.name,
+            fileSize: file.size,
+            fileType: file.type,
+            detectedTypeFromFilename: filenameType,
+            flow: 'form'
+          }
+        }
+      );
+      
+      // Then verify with AI to get accurate document type
+      setIsVerifying(true);
+      try {
+        const formDataToSend = new FormData();
+        formDataToSend.append('document', file);
+        formDataToSend.append('type', 'unknown'); // Don't bias the AI with filename guess
+        
+        console.log('[AdditionalInfoStep] Sending document to AI for verification...');
+        const response = await fetch('/api/verify-document', {
+          method: 'POST',
+          body: formDataToSend,
+        });
+        
+        const result = await response.json();
+        console.log('[AdditionalInfoStep] AI verification result:', result);
+        
+        // Helper function to extract field value from fields array
+        const getFieldValue = (fields: any[], key: string): string | null => {
+          if (!fields || !Array.isArray(fields)) return null;
+          const field = fields.find((f: any) => f.key?.toLowerCase() === key.toLowerCase());
+          return field?.value || null;
+        };
+        
+        if (result.success && result.extractedData?.documentType) {
+          const aiDetectedType = result.extractedData.documentType;
+          console.log('[AdditionalInfoStep] AI detected document type:', aiDetectedType);
+          
+          // Normalize the AI detected type
+          const normalizedType = aiDetectedType.toLowerCase().replace(/[_\s-]/g, '_');
+          let finalType = normalizedType;
+          
+          // Map common variations
+          if (normalizedType.includes('passport')) finalType = 'passport';
+          else if (normalizedType.includes('aadhaar') || normalizedType.includes('aadhar')) finalType = 'aadhaar';
+          else if (normalizedType.includes('driver') || normalizedType.includes('license')) finalType = 'drivers_license';
+          else if (normalizedType.includes('pan')) finalType = 'pan_card';
+          else if (normalizedType.includes('national')) finalType = 'national_id';
+          
+          console.log('[AdditionalInfoStep] Normalized type:', finalType);
+          setDetectedType(finalType);
+          
+          // Extract all available data from document (including from fields array)
+          const extractedIdNumber = result.extractedData.idNumber || result.extractedData.number || '';
+          const extractedDOB = result.extractedData.dateOfBirth || 
+                              result.extractedData.dob || 
+                              getFieldValue(result.extractedData.fields, 'dateOfBirth') ||
+                              getFieldValue(result.extractedData.fields, 'dob') ||
+                              getFieldValue(result.extractedData.fields, 'date_of_birth') || '';
+          const extractedAddress = result.extractedData.address || 
+                                  getFieldValue(result.extractedData.fields, 'address') || '';
+          const extractedName = result.extractedData.name || '';
+          
+          console.log('[AdditionalInfoStep] Extracted data:', {
+            idNumber: extractedIdNumber,
+            dateOfBirth: extractedDOB,
+            address: extractedAddress,
+            name: extractedName
+          });
+          
+          // Update form data with all extracted information
+          if (setFormData) {
+            setFormData({
+              ...formData,
+              idType: finalType,
+              ...(extractedIdNumber ? { idNumber: extractedIdNumber } : {}),
+              ...(extractedDOB ? { dateOfBirth: extractedDOB } : {}),
+              ...(extractedName ? { fullName: extractedName } : {}),
+            });
+          }
+
+          // Store extracted data for display after final decision
+          if (onExtractedDataChange) {
+            onExtractedDataChange({
+              documentType: finalType,
+              name: extractedName,
+              idNumber: extractedIdNumber,
+              dateOfBirth: extractedDOB,
+              address: extractedAddress,
+              fields: result.extractedData.fields
+            });
+          }
+
+          // Record OCR extraction in audit trail
+          const extractedFields: Record<string, string> = {
+            documentType: finalType,
+            ...(extractedIdNumber ? { idNumber: extractedIdNumber } : {}),
+            ...(extractedDOB ? { dateOfBirth: extractedDOB } : {}),
+            ...(extractedAddress ? { address: extractedAddress } : {}),
+            ...(extractedName ? { name: extractedName } : {}),
+          };
+
+          const extractedFieldsList = Object.entries(extractedFields)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(', ');
+
+          // Import recordStep if not already imported
+          const { recordStep } = await import('@/lib/auditStore');
+          
+          recordStep(
+            'ocr_extraction_form',
+            'Document Data Extracted',
+            `OCR successfully extracted ${Object.keys(extractedFields).length} field(s) from the uploaded document.`,
+            'documents',
+            'completed',
+            {
+              icon: '🔍',
+              detail: extractedFieldsList,
+              metadata: {
+                extractedFields,
+                documentType: finalType,
+                confidence: result.confidence || 'N/A',
+                extractionMethod: 'OCR + AI',
+                flow: 'form'
+              }
+            }
+          );
+        } else {
+          // AI detection failed, keep filename-based detection
+          console.warn('[AdditionalInfoStep] AI detection failed:', result.error || 'No document type returned');
+          setVerificationError(result.error ? `AI detection failed: ${result.error}. You can manually enter the document ID below.` : 'AI detection unavailable. You can manually enter the document ID below.');
+          
+          // Record failed OCR extraction in audit trail
+          const { recordStep } = await import('@/lib/auditStore');
+          
+          recordStep(
+            'ocr_extraction_form_failed',
+            'Document Extraction Failed',
+            `OCR could not extract structured data from the document: ${result.error || 'Unknown error'}`,
+            'documents',
+            'failed',
+            {
+              icon: '⚠️',
+              detail: result.error || 'No structured data extracted',
+              metadata: {
+                error: result.error,
+                extractionMethod: 'OCR + AI',
+                flow: 'form'
+              }
+            }
+          );
+        }
+      } catch (error) {
+        console.error('[AdditionalInfoStep] Document verification error:', error);
+        setVerificationError('Could not verify document automatically. Please select document type manually.');
+      } finally {
+        setIsVerifying(false);
       }
     }
   };
@@ -71,6 +243,35 @@ const AdditionalInfoStep: React.FC<FormStepProps> = ({ formData, handleChange, e
             Upload any identity document (Aadhaar, Passport, Driver's License, PAN, etc.)
           </p>
         </div>
+
+        {/* Manual Document Type Selector */}
+        {/* <div className="space-y-2">
+          <label className="block text-sm font-medium text-indigo-900">
+            Document Type *
+          </label>
+          <select
+            name="idType"
+            value={formData.idType}
+            onChange={(e) => {
+              handleChange(e);
+              setDetectedType(e.target.value);
+            }}
+            className="w-full px-4 py-2 border border-indigo-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+            required
+          >
+            <option value="">Select document type</option>
+            <option value="passport">Passport</option>
+            <option value="aadhaar">Aadhaar Card</option>
+            <option value="drivers_license">Driver's License</option>
+            <option value="pan_card">PAN Card</option>
+            <option value="national_id">National ID</option>
+          </select>
+          {detectedType && (
+            <p className="text-xs text-indigo-600">
+              {isVerifying ? '🔄 AI is analyzing your document...' : '✓ You can change this if the detection is incorrect'}
+            </p>
+          )}
+        </div> */}
 
         <label
           htmlFor="document-upload"
@@ -92,12 +293,25 @@ const AdditionalInfoStep: React.FC<FormStepProps> = ({ formData, handleChange, e
           {selectedFile ? (
             <div className="flex flex-col items-center space-y-2">
               <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                <FileText className="h-5 w-5 text-emerald-600" />
+                {isVerifying ? (
+                  <Loader2 className="h-5 w-5 text-emerald-600 animate-spin" />
+                ) : (
+                  <FileText className="h-5 w-5 text-emerald-600" />
+                )}
               </div>
               <span className="truncate max-w-[200px] font-semibold text-slate-800">{selectedFile.name}</span>
-              {detectedType && (
+              {isVerifying ? (
+                <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold border border-blue-300 animate-pulse">
+                  Verifying with AI...
+                </span>
+              ) : detectedType ? (
                 <span className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full font-semibold border border-indigo-300">
                   Detected: {getDocumentTypeName(detectedType)}
+                </span>
+              ) : null}
+              {verificationError && (
+                <span className="text-xs text-amber-600 text-center max-w-[250px]">
+                  {verificationError}
                 </span>
               )}
               <span className="text-[10px] opacity-70 text-slate-600">Click to change file</span>
@@ -115,6 +329,51 @@ const AdditionalInfoStep: React.FC<FormStepProps> = ({ formData, handleChange, e
           )}
         </label>
         {errors?.idType && <span className="text-red-500 text-xs">{errors.idType}</span>}
+        {verificationError && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-xs text-amber-800">
+              ⚠️ {verificationError}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Document ID Number Field */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-indigo-900">
+          Document ID Number *
+          {errors?.idNumber && <span className="text-red-500 text-xs ml-2">{errors.idNumber}</span>}
+        </label>
+        <input
+          type="text"
+          name="idNumber"
+          value={formData.idNumber}
+          onChange={handleChange}
+          readOnly={formData.idNumber && !verificationError}
+          className={`w-full px-4 py-2 border ${errors?.idNumber ? 'border-red-500' : 'border-indigo-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 ${
+            formData.idNumber && !verificationError 
+              ? 'bg-gray-50 text-gray-700 cursor-not-allowed' 
+              : 'bg-white'
+          }`}
+          placeholder={
+            formData.idNumber && !verificationError
+              ? formData.idNumber 
+              : detectedType === 'aadhaar' 
+                ? 'Enter 12-digit Aadhaar number' 
+                : detectedType === 'passport' 
+                  ? 'Enter passport number' 
+                  : 'Enter document ID number'
+          }
+          required
+        />
+        <p className="text-xs text-indigo-700">
+          {formData.idNumber && !verificationError
+            ? `✓ Document ID extracted: ${formData.idNumber}`
+            : verificationError
+              ? '⚠️ Auto-extraction failed. Please enter your document ID manually.'
+              : 'Upload and verify your document to automatically extract the ID number, or enter it manually.'
+          }
+        </p>
       </div>
 
       {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

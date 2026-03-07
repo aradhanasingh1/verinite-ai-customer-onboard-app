@@ -303,7 +303,14 @@ const MultiStepForm: React.FC = () => {
           residencyCountry: formData.country,
           monthly_income: parseInt(formData.annualIncome) / 12,
           monthly_liabilities: 0,
-          cibil_score: parseInt(formData.cibilScore) || 0
+          cibil_score: parseInt(formData.cibilScore) || 0,
+          address: {
+            line1: formData.line1,
+            city: formData.city,
+            state: formData.state,
+            postalCode: formData.postalCode,
+            country: formData.country
+          }
         },
         documents: [
           {
@@ -419,10 +426,20 @@ const MultiStepForm: React.FC = () => {
       console.log('Onboarding started with trace ID:', newTraceId);
       const traceId = newTraceId;
 
+      let pollAttempts = 0;
+      const MAX_POLL_ATTEMPTS = 60; // 60 seconds max (60 attempts * 1 second interval)
+
       const checkStatus = async () => {
         try {
+          pollAttempts++;
+          
+          if (pollAttempts > MAX_POLL_ATTEMPTS) {
+            console.error('Polling timeout: Maximum attempts reached');
+            throw new Error('Verification is taking longer than expected. Please try again or contact support.');
+          }
+
           const statusResponse = await axios.get(`http://localhost:4000/onboarding/trace/${traceId}`);
-          console.log('Full status response:', JSON.stringify(statusResponse.data, null, 2));
+          console.log(`Full status response (attempt ${pollAttempts}/${MAX_POLL_ATTEMPTS}):`, JSON.stringify(statusResponse.data, null, 2));
 
           if (statusResponse.data.status === 'completed') {
             const decision = statusResponse.data.finalDecision ||

@@ -658,10 +658,30 @@ function ClientSideChat() {
 
       if (traceId) {
         // Poll for the final decision
+        let pollAttempts = 0;
+        const MAX_POLL_ATTEMPTS = 60; // 60 seconds max (60 attempts * 1 second interval)
+
         const checkStatus = async (): Promise<void> => {
           try {
+            pollAttempts++;
+            
+            if (pollAttempts > MAX_POLL_ATTEMPTS) {
+              console.error('[ChatInterface] Polling timeout: Maximum attempts reached');
+              setMessages(prev => [...prev, {
+                id: `error-${Date.now()}`,
+                content: 'Verification is taking longer than expected. Please try again or contact support.',
+                role: 'assistant',
+                type: 'error',
+                suggestions: [],
+                timestamp: new Date().toISOString(),
+              }]);
+              return;
+            }
+
             const statusResponse = await fetch(`${API_BASE_URL}/onboarding/trace/${traceId}`);
             const statusData = await statusResponse.json();
+            
+            console.log(`[ChatInterface] Status check (attempt ${pollAttempts}/${MAX_POLL_ATTEMPTS}):`, statusData.status);
 
             if (statusData.status === 'completed') {
               // Extract final decision from various possible locations

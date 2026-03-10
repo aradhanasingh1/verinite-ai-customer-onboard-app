@@ -65,8 +65,20 @@ const AddressInfoStep: React.FC<AddressInfoStepProps> = ({
       });
 
       // If verified, update the form data with the verified address
+      // BUT keep the original line1 (user input) for validation purposes
       if (isVerified) {
-        onUpdateFormData({ line1: verifiedAddress });
+        // Save the original user input before updating
+        const originalLine1 = formData.line1;
+        console.log('[AddressInfoStep] Original line1:', originalLine1);
+        console.log('[AddressInfoStep] Verified address:', verifiedAddress);
+        
+        // Update other fields but keep line1 as the original user input
+        // This allows us to compare user input vs document extracted address
+        onUpdateFormData({ 
+          line1: originalLine1 // Keep original user input
+        });
+        
+        console.log('[AddressInfoStep] After update, line1:', formData.line1);
       }
 
       return isVerified;

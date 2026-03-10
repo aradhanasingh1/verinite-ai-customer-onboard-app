@@ -502,6 +502,7 @@ const MultiStepForm: React.FC = () => {
         }
         
         // Validate Address
+        console.log('[Form] formData.line1 at validation time:', formData.line1);
         const userProvidedAddress = formData.line1;
         const documentAddress = extractedDocumentData.address || 
                                getFieldValue(extractedDocumentData.fields || [], 'address');
@@ -700,16 +701,33 @@ const MultiStepForm: React.FC = () => {
           // Return early - do not call startOnboarding
           return;
         } else {
-          // Create detailed match summary
+          // Create detailed match summary with partial match indicators
           const matchSummary: string[] = [];
-          if (userProvidedName && documentName) {
-            matchSummary.push(`✅ NAME MATCH: Your entered name "${userProvidedName}" matches document extracted name "${documentName}"`);
+          
+          // Use session applicant name for consistency
+          const session = getCurrentSession();
+          const applicantName = session?.applicantName || userProvidedName;
+          
+          if (applicantName && documentName) {
+            if (applicantName.toLowerCase().trim() === documentName.toLowerCase().trim()) {
+              matchSummary.push(`✅ NAME MATCH (Exact): Your entered name "${applicantName}" exactly matches document extracted name "${documentName}"`);
+            } else {
+              matchSummary.push(`✅ NAME MATCH (Partial): Your entered name "${applicantName}" partially matches document extracted name "${documentName}"`);
+            }
           }
           if (userProvidedAddress && documentAddress) {
-            matchSummary.push(`✅ ADDRESS MATCH: Your entered address "${userProvidedAddress}" matches document extracted address "${documentAddress}"`);
+            if (userProvidedAddress.toLowerCase().trim() === documentAddress.toLowerCase().trim()) {
+              matchSummary.push(`✅ ADDRESS MATCH (Exact): Your entered address "${userProvidedAddress}" exactly matches document extracted address "${documentAddress}"`);
+            } else {
+              matchSummary.push(`✅ ADDRESS MATCH (Partial): Your entered address "${userProvidedAddress}" partially matches document extracted address "${documentAddress}"`);
+            }
           }
           if (userProvidedDob && documentDob) {
-            matchSummary.push(`✅ DATE OF BIRTH MATCH: Your entered DOB "${userProvidedDob}" matches document extracted DOB "${documentDob}"`);
+            if (userProvidedDob.toLowerCase().trim() === documentDob.toLowerCase().trim()) {
+              matchSummary.push(`✅ DATE OF BIRTH MATCH (Exact): Your entered DOB "${userProvidedDob}" exactly matches document extracted DOB "${documentDob}"`);
+            } else {
+              matchSummary.push(`✅ DATE OF BIRTH MATCH (Partial): Your entered DOB "${userProvidedDob}" partially matches document extracted DOB "${documentDob}"`);
+            }
           }
           
           recordStep(
@@ -723,13 +741,13 @@ const MultiStepForm: React.FC = () => {
               detail: matchSummary.join('\n\n'),
               metadata: {
                 validatedFields: ['name', 'address', 'dateOfBirth'].filter(field => {
-                  if (field === 'name') return userProvidedName && documentName;
+                  if (field === 'name') return applicantName && documentName;
                   if (field === 'address') return userProvidedAddress && documentAddress;
                   if (field === 'dateOfBirth') return userProvidedDob && documentDob;
                   return false;
                 }),
                 userProvided: {
-                  name: userProvidedName,
+                  name: applicantName,
                   address: userProvidedAddress,
                   dateOfBirth: userProvidedDob
                 },

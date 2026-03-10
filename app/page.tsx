@@ -168,9 +168,27 @@ export default function CustomerOnboardingPage() {
             </Link>
           </div>
 
-          {/* ── Risk Management Section ── */}
+          {/* ── Audit trail banner ── */}
+          <div className="flex items-center justify-between rounded-xl z-0 border border-indigo-500/20 bg-gradient-to-r from-indigo-900/20 via-violet-900/20 to-purple-900/20 p-4 shadow-lg gap-4 flex-wrap backdrop-blur-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-base shadow-md shadow-indigo-500/20">
+                🔍
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-indigo-300">View Audit Trail</div>
+                <div className="text-xs text-indigo-400/80">Track your onboarding steps, verifications & application status</div>
+              </div>
+            </div>
+            <Link
+              href="/audit-trail"
+              className="rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all duration-200"
+            >
+              Open Audit Trail →
+            </Link>
+          </div>
+ {/* ── Risk Management Section ── */}
           {!loadingRiskTolerance && (
-            <div className="rounded-xl border border-orange-500/20 bg-gradient-to-r from-orange-900/20 via-red-900/20 to-rose-900/20 p-5 shadow-lg backdrop-blur-sm">
+            <div className="rounded-xl border border-orange-500/20 bg-gradient-to-r from-orange-900/20 via-red-900/20 to-rose-900/20 p-5 shadow-lg backdrop-blur-sm z-10">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-xl shadow-lg shadow-orange-500/30">
                   ⚖️
@@ -192,26 +210,6 @@ export default function CustomerOnboardingPage() {
               />
             </div>
           )}
-
-          {/* ── Audit trail banner ── */}
-          <div className="flex items-center justify-between rounded-xl z-0 border border-indigo-500/20 bg-gradient-to-r from-indigo-900/20 via-violet-900/20 to-purple-900/20 p-4 shadow-lg gap-4 flex-wrap backdrop-blur-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-base shadow-md shadow-indigo-500/20">
-                🔍
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-indigo-300">View Audit Trail</div>
-                <div className="text-xs text-indigo-400/80">Track your onboarding steps, verifications & application status</div>
-              </div>
-            </div>
-            <Link
-              href="/audit-trail"
-              className="rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all duration-200"
-            >
-              Open Audit Trail →
-            </Link>
-          </div>
-
         </div>
       </div>
     </div>

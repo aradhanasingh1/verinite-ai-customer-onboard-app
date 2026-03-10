@@ -406,6 +406,347 @@ const MultiStepForm: React.FC = () => {
         }
       );
 
+      // Validate user-provided data against extracted document data
+      if (extractedDocumentData) {
+        const validationIssues: string[] = [];
+        
+        // Helper function to normalize strings for comparison
+        const normalize = (str: string | null | undefined): string => {
+          if (!str) return '';
+          return str.toLowerCase().trim().replace(/\s+/g, ' ');
+        };
+        
+        // Helper function to check if strings match (exact or partial)
+        const isMatch = (userProvided: string, documentValue: string): boolean => {
+          if (!userProvided || !documentValue) return false;
+          const normalizedUser = normalize(userProvided);
+          const normalizedDoc = normalize(documentValue);
+          
+          console.log('[Form] Comparing:', { userProvided, documentValue, normalizedUser, normalizedDoc });
+          
+          // Exact match
+          if (normalizedUser === normalizedDoc) {
+            console.log('[Form] ✅ Exact match');
+            return true;
+          }
+          
+          // Partial match - check if one contains the other
+          if (normalizedUser.includes(normalizedDoc) || normalizedDoc.includes(normalizedUser)) {
+            console.log('[Form] ✅ Substring match');
+            return true;
+          }
+          
+          // Check word-by-word match (for names like "John Doe" vs "Doe John")
+          const userWords = normalizedUser.split(' ').filter(w => w.length > 0);
+          const docWords = normalizedDoc.split(' ').filter(w => w.length > 0);
+          
+          // If at least 50% of words match, consider it a match
+          const matchingWords = userWords.filter(word => docWords.includes(word));
+          const matchPercentage = matchingWords.length / Math.min(userWords.length, docWords.length);
+          console.log('[Form] Word match:', { matchingWords, matchPercentage, threshold: 0.5 });
+          
+          if (matchingWords.length >= Math.min(userWords.length, docWords.length) * 0.5) {
+            console.log('[Form] ✅ Word-based match (50%+)');
+            return true;
+          }
+          
+          console.log('[Form] ❌ No match');
+          return false;
+        };
+        
+        let hasValidationFailure = false;
+        
+        // Validate Name
+        const userProvidedName = formData.fullName;
+        const documentName = extractedDocumentData.name;
+        if (userProvidedName && documentName) {
+          if (!isMatch(userProvidedName, documentName)) {
+            hasValidationFailure = true;
+            validationIssues.push(`Name mismatch: User provided "${formData.fullName}" but document shows "${extractedDocumentData.name}"`);
+            
+            recordStep(
+              'validation_name_mismatch',
+              '❌ Name Mismatch Detected',
+              `CRITICAL: User-provided name does not match document. User: "${formData.fullName}" | Document: "${extractedDocumentData.name}"`,
+              'documents',
+              'failed',
+              {
+                icon: '❌',
+                detail: 'Name verification FAILED - Application will be DENIED',
+                metadata: {
+                  userProvided: formData.fullName,
+                  documentExtracted: extractedDocumentData.name,
+                  validationType: 'name_match',
+                  severity: 'critical',
+                  autoDecision: 'DENY'
+                }
+              }
+            );
+          } else {
+            recordStep(
+              'validation_name_match',
+              '✅ Name Verified',
+              `User-provided name matches document: "${formData.fullName}"`,
+              'documents',
+              'completed',
+              {
+                icon: '✅',
+                detail: 'Name verification passed',
+                metadata: {
+                  verifiedName: formData.fullName,
+                  validationType: 'name_match'
+                }
+              }
+            );
+          }
+        }
+        
+        // Validate Address
+        const userProvidedAddress = formData.line1;
+        const documentAddress = extractedDocumentData.address || 
+                               getFieldValue(extractedDocumentData.fields || [], 'address');
+        
+        if (userProvidedAddress && documentAddress) {
+          // First, record the comparison
+          recordStep(
+            'address_comparison',
+            '🔍 Address Comparison',
+            `Comparing user-provided address with document-extracted address.`,
+            'documents',
+            'completed',
+            {
+              icon: '🔍',
+              detail: `User: "${userProvidedAddress}" | Document: "${documentAddress}"`,
+              metadata: {
+                userProvidedAddress: userProvidedAddress,
+                documentExtractedAddress: documentAddress,
+                validationType: 'address_comparison'
+              }
+            }
+          );
+          
+          console.log('[Form] Recorded address comparison step to audit trail');
+          
+          if (!isMatch(userProvidedAddress, documentAddress)) {
+            hasValidationFailure = true;
+            validationIssues.push(`Address mismatch: User provided "${formData.line1}" but document shows "${documentAddress}"`);
+            
+            recordStep(
+              'validation_address_mismatch',
+              '❌ Address Mismatch Detected',
+              `CRITICAL: User-provided address does not match document. User: "${formData.line1}" | Document: "${documentAddress}"`,
+              'documents',
+              'failed',
+              {
+                icon: '❌',
+                detail: 'Address verification FAILED - Application will be DENIED',
+                metadata: {
+                  userProvided: formData.line1,
+                  documentExtracted: documentAddress,
+                  validationType: 'address_match',
+                  severity: 'critical',
+                  autoDecision: 'DENY'
+                }
+              }
+            );
+          } else {
+            recordStep(
+              'validation_address_match',
+              '✅ Address Verified',
+              `User-provided address matches document: "${formData.line1}"`,
+              'documents',
+              'completed',
+              {
+                icon: '✅',
+                detail: 'Address verification passed',
+                metadata: {
+                  verifiedAddress: formData.line1,
+                  validationType: 'address_match'
+                }
+              }
+            );
+          }
+        }
+        
+        // Validate Date of Birth
+        const userProvidedDob = formData.dateOfBirth;
+        const documentDob = extractedDocumentData.dateOfBirth || 
+                           extractedDocumentData.dob || 
+                           getFieldValue(extractedDocumentData.fields || [], 'dateOfBirth') ||
+                           getFieldValue(extractedDocumentData.fields || [], 'dob') ||
+                           getFieldValue(extractedDocumentData.fields || [], 'date_of_birth');
+        
+        if (userProvidedDob && documentDob) {
+          if (!isMatch(userProvidedDob, documentDob)) {
+            hasValidationFailure = true;
+            validationIssues.push(`Date of Birth mismatch: User provided "${formData.dateOfBirth}" but document shows "${documentDob}"`);
+            
+            recordStep(
+              'validation_dob_mismatch',
+              '❌ Date of Birth Mismatch Detected',
+              `CRITICAL: User-provided DOB does not match document. User: "${formData.dateOfBirth}" | Document: "${documentDob}"`,
+              'documents',
+              'failed',
+              {
+                icon: '❌',
+                detail: 'DOB verification FAILED - Application will be DENIED',
+                metadata: {
+                  userProvided: formData.dateOfBirth,
+                  documentExtracted: documentDob,
+                  validationType: 'dob_match',
+                  severity: 'critical',
+                  autoDecision: 'DENY'
+                }
+              }
+            );
+          } else {
+            recordStep(
+              'validation_dob_match',
+              '✅ Date of Birth Verified',
+              `User-provided DOB matches document: "${formData.dateOfBirth}"`,
+              'documents',
+              'completed',
+              {
+                icon: '✅',
+                detail: 'DOB verification passed',
+                metadata: {
+                  verifiedDob: formData.dateOfBirth,
+                  validationType: 'dob_match'
+                }
+              }
+            );
+          }
+        }
+        
+        // Summary validation step
+        if (hasValidationFailure) {
+          // Create detailed mismatch summary
+          const mismatchSummary: string[] = [];
+          if (userProvidedName && documentName && !isMatch(userProvidedName, documentName)) {
+            mismatchSummary.push(`❌ NAME MISMATCH: Your entered name "${userProvidedName}" does not match document extracted name "${documentName}"`);
+          }
+          if (userProvidedAddress && documentAddress && !isMatch(userProvidedAddress, documentAddress)) {
+            mismatchSummary.push(`❌ ADDRESS MISMATCH: Your entered address "${userProvidedAddress}" does not match document extracted address "${documentAddress}"`);
+          }
+          if (userProvidedDob && documentDob && !isMatch(userProvidedDob, documentDob)) {
+            mismatchSummary.push(`❌ DATE OF BIRTH MISMATCH: Your entered DOB "${userProvidedDob}" does not match document extracted DOB "${documentDob}"`);
+          }
+          
+          recordStep(
+            'validation_summary_failed',
+            '🚫 DOCUMENT VALIDATION FAILED - APPLICATION DENIED',
+            mismatchSummary.join('\n\n'),
+            'documents',
+            'failed',
+            {
+              icon: '🚫',
+              detail: mismatchSummary.join('\n\n'),
+              metadata: {
+                totalMismatches: validationIssues.length,
+                issues: validationIssues,
+                severity: 'critical',
+                autoDecision: 'DENY',
+                overridesRiskTolerance: true,
+                mismatchDetails: mismatchSummary
+              }
+            }
+          );
+          
+          console.log('[Form] Recorded validation summary (FAILED) to audit trail:', mismatchSummary);
+          
+          // Override risk tolerance - force DENY
+          riskToleranceValue = 'deny';
+          riskToleranceLevel = 'LOW';
+          
+          recordStep(
+            'risk_tolerance_overridden',
+            '⚠️ Risk Tolerance Overridden',
+            'Document validation failed. Risk tolerance has been overridden. Application will be DENIED due to document mismatch.',
+            'risk',
+            'failed',
+            {
+              icon: '⚠️',
+              detail: 'Document mismatch overrides risk tolerance settings',
+              metadata: {
+                originalRiskTolerance: riskToleranceLevel,
+                overriddenTo: 'DENY',
+                reason: 'Document validation failure'
+              }
+            }
+          );
+          
+          // STOP HERE - Do not proceed with onboarding if validation failed
+          finaliseAudit('denied', undefined, 'DENY');
+          
+          recordStep(
+            'onboarding_final',
+            'Decision: Denied',
+            'Application automatically DENIED due to document validation failure. User-provided data does not match uploaded document.',
+            'decision',
+            'failed',
+            {
+              icon: '❌',
+              metadata: {
+                reason: 'Document validation failed',
+                validationFailures: mismatchSummary
+              }
+            }
+          );
+          
+          // Show error to user
+          setErrors({ submit: mismatchSummary.join('\n\n') });
+          setIsSubmitting(false);
+          
+          // Return early - do not call startOnboarding
+          return;
+        } else {
+          // Create detailed match summary
+          const matchSummary: string[] = [];
+          if (userProvidedName && documentName) {
+            matchSummary.push(`✅ NAME MATCH: Your entered name "${userProvidedName}" matches document extracted name "${documentName}"`);
+          }
+          if (userProvidedAddress && documentAddress) {
+            matchSummary.push(`✅ ADDRESS MATCH: Your entered address "${userProvidedAddress}" matches document extracted address "${documentAddress}"`);
+          }
+          if (userProvidedDob && documentDob) {
+            matchSummary.push(`✅ DATE OF BIRTH MATCH: Your entered DOB "${userProvidedDob}" matches document extracted DOB "${documentDob}"`);
+          }
+          
+          recordStep(
+            'validation_summary_passed',
+            '✅ Document Validation Passed',
+            matchSummary.join('\n\n'),
+            'documents',
+            'completed',
+            {
+              icon: '✅',
+              detail: matchSummary.join('\n\n'),
+              metadata: {
+                validatedFields: ['name', 'address', 'dateOfBirth'].filter(field => {
+                  if (field === 'name') return userProvidedName && documentName;
+                  if (field === 'address') return userProvidedAddress && documentAddress;
+                  if (field === 'dateOfBirth') return userProvidedDob && documentDob;
+                  return false;
+                }),
+                userProvided: {
+                  name: userProvidedName,
+                  address: userProvidedAddress,
+                  dateOfBirth: userProvidedDob
+                },
+                documentExtracted: {
+                  name: documentName,
+                  address: documentAddress,
+                  dateOfBirth: documentDob
+                },
+                matchDetails: matchSummary
+              }
+            }
+          );
+          
+          console.log('[Form] Recorded validation summary (PASSED) to audit trail:', matchSummary);
+        }
+      }
+
       const response = await startOnboarding(
         'form-submission', // documentId (form doesn't have actual document upload)
         formData.idType, // documentType

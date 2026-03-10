@@ -137,19 +137,19 @@ export function StateMachineFlow({ history, finalDecision }: StateMachineFlowPro
                           </div>
 
                           {/* Agent info */}
-                          {hasData && (
+                          {hasData && transition.data && (
                             <div className="flex items-center gap-2 flex-wrap">
-                              {transition.data.agentOutput.metadata?.agent_name && (
+                              {transition.data.agentOutput?.metadata?.agent_name && (
                                 <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/40">
                                   🤖 {transition.data.agentOutput.metadata.agent_name}
                                 </span>
                               )}
-                              {transition.data.agentOutput.metadata?.slot && (
+                              {transition.data.agentOutput?.metadata?.slot && (
                                 <span className="text-[10px] bg-violet-500/20 text-violet-300 px-2 py-0.5 rounded-full border border-violet-500/40">
                                   📍 {transition.data.agentOutput.metadata.slot}
                                 </span>
                               )}
-                              {transition.data.agentOutput.proposal && (
+                              {transition.data.agentOutput?.proposal && (
                                 <span className={`text-[10px] px-2 py-0.5 rounded-full border ${
                                   transition.data.agentOutput.proposal === 'approve' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' :
                                   transition.data.agentOutput.proposal === 'deny' ? 'bg-red-500/20 text-red-300 border-red-500/40' :
@@ -158,7 +158,7 @@ export function StateMachineFlow({ history, finalDecision }: StateMachineFlowPro
                                   {transition.data.agentOutput.proposal.toUpperCase()}
                                 </span>
                               )}
-                              {transition.data.agentOutput.confidence !== undefined && (
+                              {transition.data.agentOutput?.confidence !== undefined && (
                                 <span className="text-[10px] text-slate-400">
                                   Confidence: {Math.round(transition.data.agentOutput.confidence * 100)}%
                                 </span>
@@ -181,10 +181,10 @@ export function StateMachineFlow({ history, finalDecision }: StateMachineFlowPro
                 </button>
 
                 {/* Expanded details */}
-                {isExpanded && hasData && (
+                {isExpanded && hasData && transition.data && (
                   <div className="ml-16 mt-2 space-y-3 animate-in slide-in-from-top-2 duration-200">
                     {/* Proposal section */}
-                    {transition.data.agentOutput.proposal && (
+                    {transition.data.agentOutput?.proposal && (
                       <div className="bg-white/5 border border-white/10 rounded-lg p-3">
                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Proposal</div>
                         <div className={`text-sm font-semibold ${style.text}`}>
@@ -194,7 +194,7 @@ export function StateMachineFlow({ history, finalDecision }: StateMachineFlowPro
                     )}
 
                     {/* Reasons section */}
-                    {transition.data.agentOutput.reasons && transition.data.agentOutput.reasons.length > 0 && (
+                    {transition.data.agentOutput?.reasons && transition.data.agentOutput.reasons.length > 0 && (
                       <div className="bg-white/5 border border-white/10 rounded-lg p-3">
                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                           Reasons ({transition.data.agentOutput.reasons.length})
@@ -211,7 +211,7 @@ export function StateMachineFlow({ history, finalDecision }: StateMachineFlowPro
                     )}
 
                     {/* Policy refs section */}
-                    {transition.data.agentOutput.policy_refs && transition.data.agentOutput.policy_refs.length > 0 && (
+                    {transition.data.agentOutput?.policy_refs && transition.data.agentOutput.policy_refs.length > 0 && (
                       <div className="bg-white/5 border border-white/10 rounded-lg p-3">
                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                           Policy References
@@ -227,7 +227,7 @@ export function StateMachineFlow({ history, finalDecision }: StateMachineFlowPro
                     )}
 
                     {/* Flags section */}
-                    {transition.data.agentOutput.flags && Object.keys(transition.data.agentOutput.flags).length > 0 && (
+                    {transition.data.agentOutput?.flags && Object.keys(transition.data.agentOutput.flags).length > 0 && (
                       <div className="bg-white/5 border border-white/10 rounded-lg p-3">
                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                           Flags
@@ -239,7 +239,7 @@ export function StateMachineFlow({ history, finalDecision }: StateMachineFlowPro
                     )}
 
                     {/* Metadata section */}
-                    {transition.data.agentOutput.metadata && Object.keys(transition.data.agentOutput.metadata).length > 0 && (
+                    {transition.data.agentOutput?.metadata && Object.keys(transition.data.agentOutput.metadata).length > 0 && (
                       <div className="bg-white/5 border border-white/10 rounded-lg p-3">
                         <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
                           Metadata

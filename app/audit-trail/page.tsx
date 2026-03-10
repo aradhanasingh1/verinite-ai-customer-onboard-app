@@ -130,7 +130,7 @@ function FlowNode({ step, index, isLast }: { step: AuditStep; index: number; isL
                         <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest opacity-50">{cat.label}</span>
+                                    <span className={`text-[10px] font-semibold uppercase tracking-widest ${step.status === 'failed' ? 'opacity-90 text-red-300' : 'opacity-50'}`}>{cat.label}</span>
                                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${st.badge}`}>
                                         {st.label}
                                     </span>
@@ -141,8 +141,8 @@ function FlowNode({ step, index, isLast }: { step: AuditStep; index: number; isL
                                         </span>
                                     )}
                                 </div>
-                                <h3 className="mt-1 text-base sm:text-lg font-semibold text-white leading-snug">{step.title}</h3>
-                                <p className="mt-1 text-sm text-slate-400 leading-relaxed">{step.description}</p>
+                                <h3 className={`mt-1 text-base sm:text-lg font-semibold leading-snug ${step.status === 'failed' && step.stepKey.includes('validation') ? 'text-red-400 font-bold' : 'text-white'}`}>{step.title}</h3>
+                                <p className={`mt-1 text-sm leading-relaxed ${step.status === 'failed' && step.stepKey.includes('validation') ? 'text-red-300' : 'text-slate-400'}`}>{step.description}</p>
                                 
                                 {/* Decision outcome indicator */}
                                 {hasDecision && decisionStyle && (
@@ -313,7 +313,7 @@ function FlowNode({ step, index, isLast }: { step: AuditStep; index: number; isL
                         {step.detail && !step.metadata?.['transcript'] && (
                             <div>
                                 <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Detail</div>
-                                <div className="text-slate-300 font-mono text-sm bg-black/30 rounded-lg px-3 py-2">{String(step.detail)}</div>
+                                <div className="text-slate-300 text-sm bg-black/30 rounded-lg px-3 py-2 whitespace-pre-wrap">{String(step.detail)}</div>
                             </div>
                         )}
                         {step.metadata && Object.keys(step.metadata).length > 0 && !step.metadata['transcript'] && (
@@ -584,6 +584,10 @@ export default function AuditTrailPage() {
     const filteredSteps = (session?.steps || []).filter(step => 
         step.status === 'completed' || step.status === 'failed'
     );
+    
+    console.log('[AuditTrail] Total steps:', session?.steps.length);
+    console.log('[AuditTrail] Filtered steps (completed/failed):', filteredSteps.length);
+    console.log('[AuditTrail] Validation steps:', filteredSteps.filter(s => s.stepKey.includes('validation') || s.stepKey.includes('address_comparison')));
     
     const groupedSteps: { step: AuditStep; showDivider: boolean }[] = [];
     let lastCat = '';

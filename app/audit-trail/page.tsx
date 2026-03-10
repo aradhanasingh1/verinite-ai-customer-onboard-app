@@ -130,7 +130,7 @@ function FlowNode({ step, index, isLast }: { step: AuditStep; index: number; isL
                         <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <span className={`text-[10px] font-semibold uppercase tracking-widest ${step.status === 'failed' ? 'opacity-90 text-red-300' : 'opacity-50'}`}>{cat.label}</span>
+                                    <span className={`text-[10px] font-semibold uppercase tracking-widest ${step.status === 'failed' ? 'opacity-100 text-red-400 font-bold' : 'opacity-50'}`}>{cat.label}</span>
                                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${st.badge}`}>
                                         {st.label}
                                     </span>

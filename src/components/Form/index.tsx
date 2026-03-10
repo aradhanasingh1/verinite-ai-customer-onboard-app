@@ -416,9 +416,9 @@ const MultiStepForm: React.FC = () => {
           return str.toLowerCase().trim().replace(/\s+/g, ' ');
         };
         
-        // Helper function to check if strings match (exact or partial)
-        const isMatch = (userProvided: string, documentValue: string): boolean => {
-          if (!userProvided || !documentValue) return false;
+        // Helper function to check if strings match (exact or partial) and return match type
+        const getMatchType = (userProvided: string, documentValue: string): { isMatch: boolean; matchType: 'exact' | 'partial' | 'none'; matchPercentage: number } => {
+          if (!userProvided || !documentValue) return { isMatch: false, matchType: 'none', matchPercentage: 0 };
           const normalizedUser = normalize(userProvided);
           const normalizedDoc = normalize(documentValue);
           
@@ -427,13 +427,13 @@ const MultiStepForm: React.FC = () => {
           // Exact match
           if (normalizedUser === normalizedDoc) {
             console.log('[Form] ✅ Exact match');
-            return true;
+            return { isMatch: true, matchType: 'exact', matchPercentage: 100 };
           }
           
           // Partial match - check if one contains the other
           if (normalizedUser.includes(normalizedDoc) || normalizedDoc.includes(normalizedUser)) {
             console.log('[Form] ✅ Substring match');
-            return true;
+            return { isMatch: true, matchType: 'partial', matchPercentage: 75 };
           }
           
           // Check word-by-word match (for names like "John Doe" vs "Doe John")
@@ -442,26 +442,33 @@ const MultiStepForm: React.FC = () => {
           
           // If at least 50% of words match, consider it a match
           const matchingWords = userWords.filter(word => docWords.includes(word));
-          const matchPercentage = matchingWords.length / Math.min(userWords.length, docWords.length);
-          console.log('[Form] Word match:', { matchingWords, matchPercentage, threshold: 0.5 });
+          const matchPercentage = Math.round((matchingWords.length / Math.min(userWords.length, docWords.length)) * 100);
+          console.log('[Form] Word match:', { matchingWords, matchPercentage, threshold: 50 });
           
-          if (matchingWords.length >= Math.min(userWords.length, docWords.length) * 0.5) {
+          if (matchPercentage >= 50) {
             console.log('[Form] ✅ Word-based match (50%+)');
-            return true;
+            return { isMatch: true, matchType: 'partial', matchPercentage };
           }
           
-          console.log('[Form] ❌ No match');
-          return false;
+          console.log('[Form] ❌ No match (0%)');
+          return { isMatch: false, matchType: 'none', matchPercentage: 0 };
+        };
+        
+        // Helper function for backward compatibility
+        const isMatch = (userProvided: string, documentValue: string): boolean => {
+          return getMatchType(userProvided, documentValue).isMatch;
         };
         
         let hasValidationFailure = false;
+        let hasCompleteZeroMatch = false;
         
         // Validate Name
         const userProvidedName = formData.fullName;
         const documentName = extractedDocumentData.name;
         if (userProvidedName && documentName) {
-          if (!isMatch(userProvidedName, documentName)) {
-            hasValidationFailure = true;
+          const nameMatch = getMatchType(userProvidedName, documentName);
+          if (!nameMatch.isMatch && nameMatch.matchPercentage === 0) {
+            hasCompleteZeroMatch = true;
             validationIssues.push(`Name mismatch: User provided "${formData.fullName}" but document shows "${extractedDocumentData.name}"`);
             
             recordStep(
@@ -529,7 +536,10 @@ const MultiStepForm: React.FC = () => {
           console.log('[Form] Recorded address comparison step to audit trail');
           
           if (!isMatch(userProvidedAddress, documentAddress)) {
-            hasValidationFailure = true;
+            const addressMatch = getMatchType(userProvidedAddress, documentAddress);
+            if (addressMatch.matchPercentage === 0) {
+              hasCompleteZeroMatch = true;
+            }
             validationIssues.push(`Address mismatch: User provided "${formData.line1}" but document shows "${documentAddress}"`);
             
             recordStep(
@@ -579,7 +589,10 @@ const MultiStepForm: React.FC = () => {
         
         if (userProvidedDob && documentDob) {
           if (!isMatch(userProvidedDob, documentDob)) {
-            hasValidationFailure = true;
+            const dobMatch = getMatchType(userProvidedDob, documentDob);
+            if (dobMatch.matchPercentage === 0) {
+              hasCompleteZeroMatch = true;
+            }
             validationIssues.push(`Date of Birth mismatch: User provided "${formData.dateOfBirth}" but document shows "${documentDob}"`);
             
             recordStep(
@@ -620,7 +633,7 @@ const MultiStepForm: React.FC = () => {
         }
         
         // Summary validation step
-        if (hasValidationFailure) {
+        if (hasCompleteZeroMatch) {
           // Create detailed mismatch summary
           const mismatchSummary: string[] = [];
           if (userProvidedName && documentName && !isMatch(userProvidedName, documentName)) {
@@ -694,8 +707,9 @@ const MultiStepForm: React.FC = () => {
             }
           );
           
-          // Show error to user
-          setErrors({ submit: mismatchSummary.join('\n\n') });
+          // Show declined page to user
+          setFinalDecision('DENY');
+          setIsSuccess(true);
           setIsSubmitting(false);
           
           // Return early - do not call startOnboarding
@@ -1114,37 +1128,39 @@ const MultiStepForm: React.FC = () => {
           ))}
         </div>
         {renderStep()}
-        <div className="flex justify-between pt-6 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={prevStep}
-            disabled={currentStep === 1}
-            className={`px-4 py-2 text-sm font-medium rounded-md ${currentStep === 1
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-              }`}
-          >
-            Previous
-          </button>
-          {currentStep < 3 ? (
+        {!isSuccess && (
+          <div className="flex justify-between pt-6 border-t border-gray-200">
             <button
               type="button"
-              onClick={nextStep}
-              disabled={isNextDisabled || isSubmitting}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              onClick={prevStep}
+              disabled={currentStep === 1}
+              className={`px-4 py-2 text-sm font-medium rounded-md ${currentStep === 1
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                }`}
             >
-              {isSubmitting ? 'Processing...' : 'Next'}
+              Previous
             </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit Application'}
-            </button>
-          )}
-        </div>
+            {currentStep < 3 ? (
+              <button
+                type="button"
+                onClick={nextStep}
+                disabled={isNextDisabled || isSubmitting}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Processing...' : 'Next'}
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit Application'}
+              </button>
+            )}
+          </div>
+        )}
         {errors.submission && (
           <div className="p-4 text-sm text-red-700 bg-red-100 rounded-md">
             {errors.submission}

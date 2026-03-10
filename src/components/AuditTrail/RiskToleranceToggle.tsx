@@ -72,7 +72,7 @@ export function RiskToleranceToggle({
             >
               <Info size={16} className="text-gray-400 cursor-help" />
               {showTooltip && (
-                <div className="absolute left-0 top-6 z-10 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
+                <div className="absolute left-0 top-6 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
                   <p className="font-semibold mb-1">HIGH: Automatic approval</p>
                   <p className="mb-2">Applications are automatically approved without manual review.</p>
                   <p className="font-semibold mb-1">LOW: Manual review required</p>

@@ -601,7 +601,7 @@ function ClientSideChat() {
           }
         }
 
-        // Get the current risk tolerance from the audit store
+        // Get the current risk tolerance from the audit store (declare before validation)
         const session = getCurrentSession();
         let riskToleranceValue = 'high'; // Default to high for auto-approval
         let riskToleranceLevel: 'HIGH' | 'LOW' = 'HIGH';
@@ -612,37 +612,418 @@ function ClientSideChat() {
               riskToleranceValue = riskTolerance.toLowerCase();
               riskToleranceLevel = riskTolerance;
               console.log(`[ChatInterface] Using risk tolerance: ${riskToleranceValue}`);
-              
-              // Record audit step showing risk tolerance is being applied
-              const riskDescription = riskToleranceLevel === 'HIGH'
-                ? 'Applying HIGH risk tolerance: Will auto-approve if document matches application.'
-                : 'Applying LOW risk tolerance: Will escalate for manual review.';
-              
-              recordStep(
-                'risk_tolerance_applied',
-                `Risk Tolerance Applied: ${riskToleranceLevel}`,
-                riskDescription,
-                'risk',
-                'completed',
-                {
-                  icon: riskToleranceLevel === 'HIGH' ? '🚀' : '🛡️',
-                  detail: riskToleranceLevel === 'HIGH' 
-                    ? 'Decision Rule: HIGH + Document Match → APPROVE' 
-                    : 'Decision Rule: LOW → ESCALATE (Manual Review)',
-                  metadata: {
-                    level: riskToleranceLevel,
-                    appliedAt: new Date().toISOString(),
-                    expectedBehavior: riskToleranceLevel === 'HIGH'
-                      ? 'Auto-approve on document match'
-                      : 'Manual review required'
-                  }
-                }
-              );
             }
           } catch (error) {
             console.warn('[ChatInterface] Failed to get risk tolerance, using default (high):', error);
           }
         }
+
+        // Validate user-provided data against extracted document data
+        if (parsedExtractedData && context) {
+          console.log('[ChatInterface] Starting validation - parsedExtractedData:', parsedExtractedData);
+          console.log('[ChatInterface] collectedData:', collectedData);
+          
+          const validationIssues: string[] = [];
+          
+          // Helper function to normalize strings for comparison
+          const normalize = (str: string | null | undefined): string => {
+            if (!str) return '';
+            return str.toLowerCase().trim().replace(/\s+/g, ' ');
+          };
+          
+          // Helper function to check if strings match (exact or partial)
+          const isMatch = (userProvided: string, documentValue: string): boolean => {
+            if (!userProvided || !documentValue) return false;
+            const normalizedUser = normalize(userProvided);
+            const normalizedDoc = normalize(documentValue);
+            
+            console.log('[ChatInterface] Comparing:', { userProvided, documentValue, normalizedUser, normalizedDoc });
+            
+            // Exact match
+            if (normalizedUser === normalizedDoc) {
+              console.log('[ChatInterface] ✅ Exact match');
+              return true;
+            }
+            
+            // Partial match - check if one contains the other
+            if (normalizedUser.includes(normalizedDoc) || normalizedDoc.includes(normalizedUser)) {
+              console.log('[ChatInterface] ✅ Substring match');
+              return true;
+            }
+            
+            // Check word-by-word match (for names like "John Doe" vs "Doe John")
+            const userWords = normalizedUser.split(' ').filter(w => w.length > 0);
+            const docWords = normalizedDoc.split(' ').filter(w => w.length > 0);
+            
+            // If at least 50% of words match, consider it a match
+            const matchingWords = userWords.filter(word => docWords.includes(word));
+            const matchPercentage = matchingWords.length / Math.min(userWords.length, docWords.length);
+            console.log('[ChatInterface] Word match:', { matchingWords, matchPercentage, threshold: 0.5 });
+            
+            if (matchingWords.length >= Math.min(userWords.length, docWords.length) * 0.5) {
+              console.log('[ChatInterface] ✅ Word-based match (50%+)');
+              return true;
+            }
+            
+            console.log('[ChatInterface] ❌ No match');
+            return false;
+          };
+          
+          let hasValidationFailure = false;
+          
+          // Validate Name
+          const userProvidedName = collectedData.fullName || collectedData.name;
+          const documentName = parsedExtractedData.name;
+          if (userProvidedName && documentName) {
+            if (!isMatch(userProvidedName, documentName)) {
+              hasValidationFailure = true;
+              validationIssues.push(`Name mismatch: User provided "${userProvidedName}" but document shows "${documentName}"`);
+              
+              recordStep(
+                'validation_name_mismatch',
+                '❌ Name Mismatch Detected',
+                `CRITICAL: User-provided name does not match document. User: "${userProvidedName}" | Document: "${documentName}"`,
+                'documents',
+                'failed',
+                {
+                  icon: '❌',
+                  detail: 'Name verification FAILED - Application will be DENIED',
+                  metadata: {
+                    userProvided: userProvidedName,
+                    documentExtracted: documentName,
+                    validationType: 'name_match',
+                    severity: 'critical',
+                    autoDecision: 'DENY',
+                    flow: 'chat'
+                  }
+                }
+              );
+            } else {
+              recordStep(
+                'validation_name_match',
+                '✅ Name Verified',
+                `User-provided name matches document: "${userProvidedName}"`,
+                'documents',
+                'completed',
+                {
+                  icon: '✅',
+                  detail: 'Name verification passed',
+                  metadata: {
+                    verifiedName: userProvidedName,
+                    validationType: 'name_match',
+                    flow: 'chat'
+                  }
+                }
+              );
+            }
+          }
+          
+          // Validate Address
+          // Get user-entered address from agent's collected data ONLY
+          const userProvidedAddress = collectedData.address;
+          const documentAddress = parsedExtractedData.address || 
+                                  getFieldValue(parsedExtractedData.fields || [], 'address');
+          
+          if (userProvidedAddress && documentAddress) {
+            // First, record the comparison
+            recordStep(
+              'address_comparison',
+              '🔍 Address Comparison',
+              `Comparing user-provided address with document-extracted address.`,
+              'documents',
+              'completed',
+              {
+                icon: '🔍',
+                detail: `User: "${userProvidedAddress}" | Document: "${documentAddress}"`,
+                metadata: {
+                  userProvidedAddress: userProvidedAddress,
+                  documentExtractedAddress: documentAddress,
+                  validationType: 'address_comparison',
+                  flow: 'chat'
+                }
+              }
+            );
+            
+            console.log('[ChatInterface] Recorded address comparison step to audit trail');
+            
+            if (!isMatch(userProvidedAddress, documentAddress)) {
+              hasValidationFailure = true;
+              validationIssues.push(`Address mismatch: User provided "${userProvidedAddress}" but document shows "${documentAddress}"`);
+              
+              recordStep(
+                'validation_address_mismatch',
+                '❌ Address Mismatch Detected',
+                `CRITICAL: User-provided address does not match document. User: "${userProvidedAddress}" | Document: "${documentAddress}"`,
+                'documents',
+                'failed',
+                {
+                  icon: '❌',
+                  detail: 'Address verification FAILED - Application will be DENIED',
+                  metadata: {
+                    userProvided: userProvidedAddress,
+                    documentExtracted: documentAddress,
+                    validationType: 'address_match',
+                    severity: 'critical',
+                    autoDecision: 'DENY',
+                    flow: 'chat'
+                  }
+                }
+              );
+            } else {
+              recordStep(
+                'validation_address_match',
+                '✅ Address Verified',
+                `User-provided address matches document: "${userProvidedAddress}"`,
+                'documents',
+                'completed',
+                {
+                  icon: '✅',
+                  detail: 'Address verification passed',
+                  metadata: {
+                    verifiedAddress: userProvidedAddress,
+                    validationType: 'address_match',
+                    flow: 'chat'
+                  }
+                }
+              );
+            }
+          }
+          
+          // Validate Date of Birth
+          const userProvidedDob = dob;
+          const documentDob = parsedExtractedData.dateOfBirth || 
+                             parsedExtractedData.dob || 
+                             getFieldValue(parsedExtractedData.fields || [], 'dateOfBirth') ||
+                             getFieldValue(parsedExtractedData.fields || [], 'dob') ||
+                             getFieldValue(parsedExtractedData.fields || [], 'date_of_birth');
+          
+          if (userProvidedDob && documentDob) {
+            if (!isMatch(userProvidedDob, documentDob)) {
+              hasValidationFailure = true;
+              validationIssues.push(`Date of Birth mismatch: User provided "${userProvidedDob}" but document shows "${documentDob}"`);
+              
+              recordStep(
+                'validation_dob_mismatch',
+                '❌ Date of Birth Mismatch Detected',
+                `CRITICAL: User-provided DOB does not match document. User: "${userProvidedDob}" | Document: "${documentDob}"`,
+                'documents',
+                'failed',
+                {
+                  icon: '❌',
+                  detail: 'DOB verification FAILED - Application will be DENIED',
+                  metadata: {
+                    userProvided: userProvidedDob,
+                    documentExtracted: documentDob,
+                    validationType: 'dob_match',
+                    severity: 'critical',
+                    autoDecision: 'DENY',
+                    flow: 'chat'
+                  }
+                }
+              );
+            } else {
+              recordStep(
+                'validation_dob_match',
+                '✅ Date of Birth Verified',
+                `User-provided DOB matches document: "${userProvidedDob}"`,
+                'documents',
+                'completed',
+                {
+                  icon: '✅',
+                  detail: 'DOB verification passed',
+                  metadata: {
+                    verifiedDob: userProvidedDob,
+                    validationType: 'dob_match',
+                    flow: 'chat'
+                  }
+                }
+              );
+            }
+          }
+          
+          // Summary validation step
+          if (hasValidationFailure) {
+            // Create detailed mismatch summary
+            const mismatchSummary: string[] = [];
+            if (userProvidedName && documentName && !isMatch(userProvidedName, documentName)) {
+              mismatchSummary.push(`❌ NAME MISMATCH: Your entered name "${userProvidedName}" does not match document extracted name "${documentName}"`);
+            }
+            if (userProvidedAddress && documentAddress && !isMatch(userProvidedAddress, documentAddress)) {
+              mismatchSummary.push(`❌ ADDRESS MISMATCH: Your entered address "${userProvidedAddress}" does not match document extracted address "${documentAddress}"`);
+            }
+            if (userProvidedDob && documentDob && !isMatch(userProvidedDob, documentDob)) {
+              mismatchSummary.push(`❌ DATE OF BIRTH MISMATCH: Your entered DOB "${userProvidedDob}" does not match document extracted DOB "${documentDob}"`);
+            }
+            
+            recordStep(
+              'validation_summary_failed',
+              '🚫 DOCUMENT VALIDATION FAILED - APPLICATION DENIED',
+              mismatchSummary.join('\n\n'),
+              'documents',
+              'failed',
+              {
+                icon: '🚫',
+                detail: mismatchSummary.join('\n\n'),
+                metadata: {
+                  totalMismatches: validationIssues.length,
+                  issues: validationIssues,
+                  severity: 'critical',
+                  autoDecision: 'DENY',
+                  overridesRiskTolerance: true,
+                  flow: 'chat',
+                  mismatchDetails: mismatchSummary
+                }
+              }
+            );
+            
+            console.log('[ChatInterface] Recorded validation summary (FAILED) to audit trail:', mismatchSummary);
+            
+            // Override risk tolerance - force DENY
+            riskToleranceValue = 'deny';
+            riskToleranceLevel = 'LOW';
+            
+            recordStep(
+              'risk_tolerance_overridden',
+              '⚠️ Risk Tolerance Overridden',
+              'Document validation failed. Risk tolerance has been overridden. Application will be DENIED due to document mismatch.',
+              'risk',
+              'failed',
+              {
+                icon: '⚠️',
+                detail: 'Document mismatch overrides risk tolerance settings',
+                metadata: {
+                  originalRiskTolerance: riskToleranceLevel,
+                  overriddenTo: 'DENY',
+                  reason: 'Document validation failure',
+                  flow: 'chat'
+                }
+              }
+            );
+            
+            // STOP HERE - Do not proceed with onboarding if validation failed
+            finaliseAudit('denied', undefined, 'DENY');
+            
+            recordStep(
+              'onboarding_final',
+              'Decision: Denied',
+              'Application automatically DENIED due to document validation failure. User-provided data does not match uploaded document.',
+              'decision',
+              'failed',
+              {
+                icon: '❌',
+                metadata: {
+                  reason: 'Document validation failed',
+                  validationFailures: mismatchSummary
+                }
+              }
+            );
+            
+            // Show denial message to user
+            setMessages(prev => [...prev, {
+              id: `decision-${Date.now()}`,
+              content: `❌ APPLICATION DENIED\n\nYour application has been denied because the information you provided does not match your uploaded document.\n\n${mismatchSummary.join('\n\n')}\n\nPlease ensure your details match your document exactly and try again.`,
+              role: 'assistant',
+              type: 'error',
+              suggestions: [],
+              timestamp: new Date().toISOString(),
+            }]);
+            
+            setIsCompleted(true);
+            setCurrentField(null);
+            
+            // Return early - do not call startOnboarding
+            return;
+          } else {
+            // Create detailed match summary with partial match indicators
+            const matchSummary: string[] = [];
+            
+            // Use session applicant name for consistency
+            const session = getCurrentSession();
+            const applicantName = session?.applicantName || userProvidedName;
+            
+            if (applicantName && documentName) {
+              if (applicantName.toLowerCase().trim() === documentName.toLowerCase().trim()) {
+                matchSummary.push(`✅ NAME MATCH (Exact): Your entered name "${applicantName}" exactly matches document extracted name "${documentName}"`);
+              } else {
+                matchSummary.push(`✅ NAME MATCH (Partial): Your entered name "${applicantName}" partially matches document extracted name "${documentName}"`);
+              }
+            }
+            if (userProvidedAddress && documentAddress) {
+              if (userProvidedAddress.toLowerCase().trim() === documentAddress.toLowerCase().trim()) {
+                matchSummary.push(`✅ ADDRESS MATCH (Exact): Your entered address "${userProvidedAddress}" exactly matches document extracted address "${documentAddress}"`);
+              } else {
+                matchSummary.push(`✅ ADDRESS MATCH (Partial): Your entered address "${userProvidedAddress}" partially matches document extracted address "${documentAddress}"`);
+              }
+            }
+            if (userProvidedDob && documentDob) {
+              if (userProvidedDob.toLowerCase().trim() === documentDob.toLowerCase().trim()) {
+                matchSummary.push(`✅ DATE OF BIRTH MATCH (Exact): Your entered DOB "${userProvidedDob}" exactly matches document extracted DOB "${documentDob}"`);
+              } else {
+                matchSummary.push(`✅ DATE OF BIRTH MATCH (Partial): Your entered DOB "${userProvidedDob}" partially matches document extracted DOB "${documentDob}"`);
+              }
+            }
+            
+            recordStep(
+              'validation_summary_passed',
+              '✅ Document Validation Passed',
+              matchSummary.join('\n\n'),
+              'documents',
+              'completed',
+              {
+                icon: '✅',
+                detail: matchSummary.join('\n\n'),
+                metadata: {
+                  validatedFields: ['name', 'address', 'dateOfBirth'].filter(field => {
+                    if (field === 'name') return applicantName && documentName;
+                    if (field === 'address') return userProvidedAddress && documentAddress;
+                    if (field === 'dateOfBirth') return userProvidedDob && documentDob;
+                    return false;
+                  }),
+                  userProvided: {
+                    name: applicantName,
+                    address: userProvidedAddress,
+                    dateOfBirth: userProvidedDob
+                  },
+                  documentExtracted: {
+                    name: documentName,
+                    address: documentAddress,
+                    dateOfBirth: documentDob
+                  },
+                  flow: 'chat',
+                  matchDetails: matchSummary
+                }
+              }
+            );
+            
+            console.log('[ChatInterface] Recorded validation summary (PASSED) to audit trail:', matchSummary);
+          }
+        }
+
+        // Record audit step showing risk tolerance is being applied (after validation)
+        const riskDescription = riskToleranceLevel === 'HIGH'
+          ? 'Applying HIGH risk tolerance: Will auto-approve if document matches application.'
+          : 'Applying LOW risk tolerance: Will escalate for manual review.';
+        
+        recordStep(
+          'risk_tolerance_applied',
+          `Risk Tolerance Applied: ${riskToleranceLevel}`,
+          riskDescription,
+          'risk',
+          'completed',
+          {
+            icon: riskToleranceLevel === 'HIGH' ? '🚀' : '🛡️',
+            detail: riskToleranceLevel === 'HIGH' 
+              ? 'Decision Rule: HIGH + Document Match → APPROVE' 
+              : 'Decision Rule: LOW → ESCALATE (Manual Review)',
+            metadata: {
+              level: riskToleranceLevel,
+              appliedAt: new Date().toISOString(),
+              expectedBehavior: riskToleranceLevel === 'HIGH'
+                ? 'Auto-approve on document match'
+                : 'Manual review required'
+            }
+          }
+        );
 
         // Start the onboarding process after successful upload and confirmation
         const onboardingResponse = await startOnboarding(

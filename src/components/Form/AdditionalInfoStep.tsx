@@ -349,7 +349,7 @@ const AdditionalInfoStep: React.FC<FormStepProps> = ({ formData, handleChange, e
           name="idNumber"
           value={formData.idNumber}
           onChange={handleChange}
-          readOnly={formData.idNumber && !verificationError}
+          readOnly={Boolean(formData.idNumber && !verificationError)}
           className={`w-full px-4 py-2 border ${errors?.idNumber ? 'border-red-500' : 'border-indigo-300'} rounded-lg focus:ring-indigo-500 focus:border-indigo-500 ${
             formData.idNumber && !verificationError 
               ? 'bg-gray-50 text-gray-700 cursor-not-allowed' 

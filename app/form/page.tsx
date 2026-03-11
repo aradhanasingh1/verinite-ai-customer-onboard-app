@@ -17,9 +17,9 @@ export default function FormPage() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white group-hover:text-indigo-400 transition-colors">
-                  Verinite
+                  Customer Onboarding
                 </h1>
-                <p className="text-xs text-slate-400">Customer Onboarding</p>
+                {/* <p className="text-xs text-slate-400">Customer Onboarding</p> */}
               </div>
             </Link>
 

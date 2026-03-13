@@ -509,8 +509,28 @@ const MultiStepForm: React.FC = () => {
         }
         
         // Validate Address
-        console.log('[Form] formData.line1 at validation time:', formData.line1);
-        const userProvidedAddress = formData.line1;
+        console.log('[Form] formData at validation time:', {
+          line1: formData.line1,
+          city: formData.city,
+          state: formData.state,
+          postalCode: formData.postalCode,
+          country: formData.country
+        });
+        
+        // Build complete address from all fields
+        const buildCompleteAddress = (line1: string, city: string, state: string, postalCode: string, country: string): string => {
+          const parts = [line1, city, state, postalCode, country].filter(p => p && p.trim());
+          return parts.join(', ');
+        };
+        
+        const userProvidedAddress = buildCompleteAddress(
+          formData.line1 || '',
+          formData.city || '',
+          formData.state || '',
+          formData.postalCode || '',
+          formData.country || ''
+        );
+        console.log('[Form] Built userProvidedAddress:', userProvidedAddress);
         const documentAddress = extractedDocumentData.address || 
                                getFieldValue(extractedDocumentData.fields || [], 'address');
         
@@ -540,19 +560,19 @@ const MultiStepForm: React.FC = () => {
             if (addressMatch.matchPercentage === 0) {
               hasCompleteZeroMatch = true;
             }
-            validationIssues.push(`Address mismatch: User provided "${formData.line1}" but document shows "${documentAddress}"`);
+            validationIssues.push(`Address mismatch: User provided "${userProvidedAddress}" but document shows "${documentAddress}"`);
             
             recordStep(
               'validation_address_mismatch',
               '❌ Address Mismatch Detected',
-              `CRITICAL: User-provided address does not match document. User: "${formData.line1}" | Document: "${documentAddress}"`,
+              `CRITICAL: User-provided address does not match document. User: "${userProvidedAddress}" | Document: "${documentAddress}"`,
               'documents',
               'failed',
               {
                 icon: '❌',
                 detail: 'Address verification FAILED - Application will be DENIED',
                 metadata: {
-                  userProvided: formData.line1,
+                  userProvided: userProvidedAddress,
                   documentExtracted: documentAddress,
                   validationType: 'address_match',
                   severity: 'critical',
@@ -564,14 +584,14 @@ const MultiStepForm: React.FC = () => {
             recordStep(
               'validation_address_match',
               '✅ Address Verified',
-              `User-provided address matches document: "${formData.line1}"`,
+              `User-provided address matches document: "${userProvidedAddress}"`,
               'documents',
               'completed',
               {
                 icon: '✅',
                 detail: 'Address verification passed',
                 metadata: {
-                  verifiedAddress: formData.line1,
+                  verifiedAddress: userProvidedAddress,
                   validationType: 'address_match'
                 }
               }
